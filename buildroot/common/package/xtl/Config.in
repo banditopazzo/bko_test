@@ -1,0 +1,8 @@
+config BR2_PACKAGE_XTL
+	bool "xtl"
+	depends on BR2_INSTALL_LIBSTDCPP
+	help
+	  Basic tools (containers, algorithms) used by other quantstack packages
+
+comment "XTL needs a toolchain w/ C++"
+	depends on !BR2_INSTALL_LIBSTDCPP

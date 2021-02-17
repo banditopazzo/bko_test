@@ -1,0 +1,11 @@
+config BR2_PACKAGE_MLE_PLAYER
+        bool "MLE player"
+        depends on BR2_INSTALL_LIBSTDCPP
+        select BR2_PACKAGE_TENSORFLOW_LITE
+        select BR2_PACKAGE_XTENSOR
+        select BR2_PACKAGE_LIBEXNL
+        help
+          Exein MLE player
+
+comment "MLE player needs a toolchain w/ C++"
+	depends on !BR2_INSTALL_LIBSTDCPP

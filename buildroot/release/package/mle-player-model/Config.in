@@ -1,0 +1,4 @@
+config BR2_PACKAGE_MLE_PLAYER_MODEL
+        bool "MLE player model"
+        help
+          Exein MLE player model

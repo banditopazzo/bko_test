@@ -1,4 +1,4 @@
-MLE_PLAYER_VERSION = 0.8.1
+MLE_PLAYER_VERSION = 0.8.2
 MLE_PLAYER_SITE = $(call github,Exein-io,mle-player,v$(MLE_PLAYER_VERSION))
 
 MLE_PLAYER_DEPENDENCIES = tensorflow-lite libexnl xtensor

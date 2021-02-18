@@ -16,14 +16,23 @@ TENSORFLOW_LITE_SUPPORTS_IN_SOURCE_BUILD = NO
 
 TENSORFLOW_LITE_CONF_OPTS += -DCMAKE_USER_MAKE_RULES_OVERRIDE=$(TOPDIR)/$(TENSORFLOW_LITE_PKGDIR)000-patch-root-path.cmake
 
-# ARM
-ifeq ($(BR2_arm),y)
+
+# ARM or AARCH64
+ifeq ($(or $(BR2_arm),$(BR2_aarch64)),y)
 	ARMCC_FLAGS = -funsafe-math-optimizations -ldl -latomic
-	ifeq ($(BR2_ARM_CPU_HAS_NEON),y)
-		ARMCC_FLAGS += -mfpu=neon
-	else	
+	ifeq ($(BR2_ARM_CPU_ARMV7A),y)
+		ARMCC_FLAGS += -march=armv7-a
+		TENSORFLOW_LITE_CONF_OPTS += -DCMAKE_SYSTEM_PROCESSOR=armv7
 		TENSORFLOW_LITE_CONF_OPTS += -DTFLITE_ENABLE_XNNPACK=OFF
-		ARMCC_FLAGS += -mfloat-abi=softfp
+		ifeq ($(BR2_ARM_CPU_HAS_NEON),y)
+			ARMCC_FLAGS += -mfpu=neon
+		else
+			ARMCC_FLAGS += -mfloat-abi=softfp
+		endif
+	else ifeq ($(BR2_ARM_CPU_ARMV8A),y)
+		ARMCC_FLAGS += -march=armv8-a
+		TENSORFLOW_LITE_CONF_OPTS += -DCMAKE_SYSTEM_PROCESSOR=armv8
+		XNNPACK = ON
 	endif
 	TENSORFLOW_LITE_CONF_OPTS += -DCMAKE_C_FLAGS="$(TARGET_CFLAGS) $(ARMCC_FLAGS)"
 	TENSORFLOW_LITE_CONF_OPTS += -DCMAKE_CXX_FLAGS="$(TARGET_CXXFLAGS) $(ARMCC_FLAGS)"
@@ -63,7 +72,7 @@ define TENSORFLOW_LITE_INSTALL_TARGET_CMDS
 	$(INSTALL) -D $(TENSORFLOW_LITE_BUILDDIR)/_deps/abseil-cpp-build/absl/strings/libabsl_cord.so $(TARGET_DIR)/usr/lib/libabsl_cord.so
 	$(INSTALL) -D $(TENSORFLOW_LITE_BUILDDIR)/_deps/abseil-cpp-build/absl/strings/libabsl_str_format_internal.so $(TARGET_DIR)/usr/lib/libabsl_str_format_internal.so
 	$(INSTALL) -D $(TENSORFLOW_LITE_BUILDDIR)/_deps/abseil-cpp-build/absl/strings/libabsl_strings.so $(TARGET_DIR)/usr/lib/libabsl_strings.so
-	$(INSTALL) -D $(TENSORFLOW_LITE_BUILDDIR)/_deps/abseil-cpp-build/absl/base/libabsl_base.so $(TARGET_DIR)/usr/lib/libabsl_base.so 
+	$(INSTALL) -D $(TENSORFLOW_LITE_BUILDDIR)/_deps/abseil-cpp-build/absl/base/libabsl_base.so $(TARGET_DIR)/usr/lib/libabsl_base.so
 	$(INSTALL) -D $(TENSORFLOW_LITE_BUILDDIR)/_deps/abseil-cpp-build/absl/base/libabsl_dynamic_annotations.so $(TARGET_DIR)/usr/lib/libabsl_dynamic_annotations.so
 	$(INSTALL) -D $(TENSORFLOW_LITE_BUILDDIR)/_deps/abseil-cpp-build/absl/base/libabsl_spinlock_wait.so $(TARGET_DIR)/usr/lib/libabsl_spinlock_wait.so
 	$(INSTALL) -D $(TENSORFLOW_LITE_BUILDDIR)/_deps/abseil-cpp-build/absl/strings/libabsl_strings_internal.so $(TARGET_DIR)/usr/lib/libabsl_strings_internal.so
@@ -71,6 +80,10 @@ define TENSORFLOW_LITE_INSTALL_TARGET_CMDS
 	$(INSTALL) -D $(TENSORFLOW_LITE_BUILDDIR)/_deps/abseil-cpp-build/absl/base/libabsl_throw_delegate.so $(TARGET_DIR)/usr/lib/libabsl_throw_delegate.so
 	$(INSTALL) -D $(TENSORFLOW_LITE_BUILDDIR)/_deps/abseil-cpp-build/absl/base/libabsl_raw_logging_internal.so $(TARGET_DIR)/usr/lib/libabsl_raw_logging_internal.so
 	$(INSTALL) -D $(TENSORFLOW_LITE_BUILDDIR)/_deps/abseil-cpp-build/absl/base/libabsl_log_severity.so $(TARGET_DIR)/usr/lib/libabsl_log_severity.so
+	$(if $(XNNPACK), $(INSTALL) -D $(TENSORFLOW_LITE_BUILDDIR)/_deps/xnnpack-build/libXNNPACK.so $(TARGET_DIR)/usr/lib/libXNNPACK.so)
+	$(if $(XNNPACK), $(INSTALL) -D $(TENSORFLOW_LITE_BUILDDIR)/cpuinfo/libcpuinfo.so $(TARGET_DIR)/usr/lib/libcpuinfo.so)
+	$(if $(XNNPACK), $(INSTALL) -D $(TENSORFLOW_LITE_BUILDDIR)/pthreadpool/libpthreadpool.so $(TARGET_DIR)/usr/lib/libpthreadpool.so)
+
 	$(INSTALL) -D $(TENSORFLOW_LITE_BUILDDIR)/libtensorflow-lite.so $(TARGET_DIR)/usr/lib/libtensorflow-lite.so
 endef
 
@@ -101,6 +114,11 @@ define TENSORFLOW_LITE_INSTALL_STAGING_CMDS
 	cp -a $(TENSORFLOW_LITE_BUILDDIR)/flatbuffers/include/flatbuffers/*.h $(STAGING_DIR)/usr/include/flatbuffers
 
 	$(INSTALL) -D $(TENSORFLOW_LITE_BUILDDIR)/libtensorflow-lite.so $(STAGING_DIR)/usr/lib/libtensorflow-lite.so
+
+	$(if $(XNNPACK), $(INSTALL) -D $(TENSORFLOW_LITE_BUILDDIR)/_deps/xnnpack-build/libXNNPACK.so $(STAGING_DIR)/usr/lib/libXNNPACK.so)
+	$(if $(XNNPACK), $(INSTALL) -D $(TENSORFLOW_LITE_BUILDDIR)/cpuinfo/libcpuinfo.so $(STAGING_DIR)/usr/lib/libcpuinfo.so)
+	$(if $(XNNPACK), $(INSTALL) -D $(TENSORFLOW_LITE_BUILDDIR)/pthreadpool/libpthreadpool.so $(STAGING_DIR)/usr/lib/libpthreadpool.so)
+
 	$(INSTALL) -D $(TENSORFLOW_LITE_BUILDDIR)/_deps/flatbuffers-build/libflatbuffers.a $(STAGING_DIR)/usr/lib/libflatbuffers.a
 
 	$(INSTALL) -D $(TENSORFLOW_LITE_BUILDDIR)/_deps/abseil-cpp-build/absl/flags/libabsl_flags.so $(STAGING_DIR)/usr/lib/libabsl_flags.so

@@ -1463,8 +1463,8 @@
 +    exein_map_inode_to_features(inode, &feature_index, NNInput);
 +    exein_map_inode_to_features(dir, &feature_index, NNInput);
 +    exein_map_qstr_to_features(qstr, &feature_index, NNInput);
-+    exein_map_string_to_features(*name, DUMMY_STRING_MAX_LENGTH, &feature_index, NNInput);
-+    NNInput[feature_index++] = (exein_feature_t) *len;
++    
++    
 +    feature_index=arg1_pos+EXEIN_INODE_INIT_SECURITY_SIZE;
 +
 +    exein_prepare_send_data(arg1_pos, feature_index, NNInput);

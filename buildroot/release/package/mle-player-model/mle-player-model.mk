@@ -1,10 +1,10 @@
-TFEXEIN_MODEL_VERSION = 1.0.0
-TFEXEIN_MODEL_SITE = $(TOPDIR)/package/tfexein_model/src
-TFEXEIN_MODEL_SITE_METHOD = local
+MLE_PLAYER_MODEL_VERSION = 1.0.0
+MLE_PLAYER_MODEL_SITE = $(TOPDIR)/package/mle-player-model/src
+MLE_PLAYER_MODEL_SITE_METHOD = local
 
-define TFEXEIN_MODEL_INSTALL_TARGET_CMDS
+define MLE_PLAYER_MODEL_INSTALL_TARGET_CMDS
 	mkdir -p $(TARGET_DIR)/etc/exein/models
-	cp -a $(TFEXEIN_MODEL_PKGDIR)/src/* $(TARGET_DIR)/etc/exein/models
+	cp -a $(MLE_PLAYER_MODEL_PKGDIR)/src/* $(TARGET_DIR)/etc/exein/models
 endef
 
 

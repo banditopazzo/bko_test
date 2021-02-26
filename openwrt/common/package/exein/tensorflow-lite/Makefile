@@ -19,7 +19,8 @@ PKG_LICENSE:=Apache-2.0
 PKG_LICENSE_FILES:=LICENSE
 PKG_MAINTAINER:=Exein <info@exein.io>
 
-CMAKE_SOURCE_SUBDIR:=tensorflow/lite
+TENSORFLOW_SUBDIR = tensorflow/lite
+CMAKE_SOURCE_SUBDIR:=$(TENSORFLOW_SUBDIR)
 PKG_SUPPORTS_IN_SOURCE_BUILD = NO
 
 PKG_INSTALL:=1
@@ -33,11 +34,11 @@ define Package/tensorflow-lite
 	SECTION:=libs
 	CATEGORY:=Exein
 	TITLE:=TensorFlow Lite is the official solution for running machine learning models on mobile and embedded devices.
-	DEPENDS:=+libatomic
+	DEPENDS:=+libstdcpp +libatomic
 endef
 
-ARMCC_FLAGS = -funsafe-math-optimizations -ldl -latomic
-ARMCC_FLAGS += -mfloat-abi=softfp
+
+#ARMCC_FLAGS += -march=armv7-m
 
 CMAKE_OPTIONS += \
 	-DSYSROOT=$(STAGING_DIR) \
@@ -52,9 +53,50 @@ CMAKE_OPTIONS += \
 	-DBUILD_TESTING=OFF \
 	-DBUILD_SHARED_LIBS=ON
 
-	-DCMAKE_C_FLAGS="$(TARGET_CPPFLAGS) $(ARMCC_FLAGS) \
-	-DCMAKE_CXX_FLAGS="$(TARGET_CPPFLAGS) $(ARMCC_FLAGS) \
-	-DTFLITE_ENABLE_XNNPACK=OFF \
+	# -DCMAKE_C_FLAGS="$(TARGET_CPPFLAGS) $(ARMCC_FLAGS)" \
+	# -DCMAKE_CXX_FLAGS="$(TARGET_CPPFLAGS) $(ARMCC_FLAGS)" \
+	# -DTFLITE_ENABLE_XNNPACK=OFF \
+	# -DCMAKE_SYSTEM_PROCESSOR=armv7
+
+COMMON_FLAGS = -ldl -latomic
+
+# ARM or AARCH64
+ifeq ($(or $(CONFIG_arm),$(CONFIG_aarch64)),y)
+	ARMCC_FLAGS = -funsafe-math-optimizations # TODO: maybe even in mips
+	ifeq ($(CONFIG_arm_v8),y) # ARMv8
+		ARMCC_FLAGS += -march=armv8-a
+		CMAKE_OPTIONS += -DCMAKE_SYSTEM_PROCESSOR=armv8
+	else
+		CMAKE_OPTIONS += -DTFLITE_ENABLE_XNNPACK=OFF
+		ifeq ($(CONFIG_arm_v7),y) # ARMv7
+			ARMCC_FLAGS += -march=armv7
+			CMAKE_OPTIONS += -DCMAKE_SYSTEM_PROCESSOR=armv7
+			ifeq ($(BR2_ARM_CPU_HAS_NEON),y) # ARMv7A + NEON
+				ARMCC_FLAGS += -mfpu=neon
+			else
+				ARMCC_FLAGS += -mfloat-abi=softfp
+			endif
+		# else ifeq ($(BR2_ARM_CPU_ARMV7M),y) # ARMv7M
+		# 	ARMCC_FLAGS += -march=armv7-m
+		# 	CMAKE_OPTIONS += -DCMAKE_SYSTEM_PROCESSOR=armv7
+		else ifeq ($(CONFIG_arm_v6),y) # ARMv6
+			ARMCC_FLAGS += -march=armv6
+			CMAKE_OPTIONS += -DCMAKE_SYSTEM_PROCESSOR=armv6
+		else ifeq ($(CONFIG_arm_v5),y) # ARMv5
+			ARMCC_FLAGS += -march=armv5
+			CMAKE_OPTIONS += -DCMAKE_SYSTEM_PROCESSOR=armv5
+		else ifeq ($(CONFIG_arm_v4),y) # ARMv4
+			ARMCC_FLAGS += -march=armv4
+			CMAKE_OPTIONS += -DCMAKE_SYSTEM_PROCESSOR=armv4
+		endif
+	endif
+	CMAKE_OPTIONS += -DCMAKE_C_FLAGS="$(TARGET_CFLAGS) $(ARMCC_FLAGS)"
+	CMAKE_OPTIONS += -DCMAKE_CXX_FLAGS="$(TARGET_CXXFLAGS) $(ARMCC_FLAGS)"
+else # This is intended for MIPS
+	CMAKE_OPTIONS += -DTFLITE_ENABLE_XNNPACK=OFF
+	CMAKE_OPTIONS += -DCMAKE_C_FLAGS="$(TARGET_CFLAGS) $(COMMON_FLAGS) -fPIC"
+	CMAKE_OPTIONS += -DCMAKE_CXX_FLAGS="$(TARGET_CXXFLAGS) $(COMMON_FLAGS) -fPIC"
+endif
 
 
 define Package/tensorflow-lite/install
@@ -64,70 +106,40 @@ define Package/tensorflow-lite/install
 
 endef
 
+TENSORFLOW_LITE_SUBDIR = $(PKG_BUILD_DIR)/$(TENSORFLOW_SUBDIR)
+TENSORFLOW_LITE_INCLUDEDIR = $(1)/usr/include/$(TENSORFLOW_SUBDIR)
+
 define Build/InstallDev
 	$(INSTALL_DIR) $(1)/usr/lib/
 	# $(INSTALL_BIN) $(PKG_BUILD_DIR)/tensorflow/lite/*.so $(1)/usr/lib
 	find $(PKG_BUILD_DIR) -name \*.so -exec cp {} $(1)/usr/lib/ \;
 
-	# TODO
-	mkdir -p $(1)/usr/include/tensorflow/./lite
-	$(CP)  $(PKG_BUILD_DIR)/tensorflow/./lite/*.h $(1)/usr/include/tensorflow/./lite
-	mkdir -p $(1)/usr/include/tensorflow/./lite/c
-	$(CP)  $(PKG_BUILD_DIR)/tensorflow/./lite/c/*.h $(1)/usr/include/tensorflow/./lite/c
-	mkdir -p $(1)/usr/include/tensorflow/./lite/core
-	$(CP)  $(PKG_BUILD_DIR)/tensorflow/./lite/core/*.h $(1)/usr/include/tensorflow/./lite/core
-	mkdir -p $(1)/usr/include/tensorflow/./lite/core/api
-	$(CP)  $(PKG_BUILD_DIR)/tensorflow/./lite/core/api/*.h $(1)/usr/include/tensorflow/./lite/core/api
-	mkdir -p $(1)/usr/include/tensorflow/./lite/delegates/flex
-	$(CP)  $(PKG_BUILD_DIR)/tensorflow/./lite/delegates/flex/*.h $(1)/usr/include/tensorflow/./lite/delegates/flex
-	mkdir -p $(1)/usr/include/tensorflow/./lite/delegates/gpu
-	$(CP)  $(PKG_BUILD_DIR)/tensorflow/./lite/delegates/gpu/*.h $(1)/usr/include/tensorflow/./lite/delegates/gpu
-	mkdir -p $(1)/usr/include/tensorflow/./lite/delegates/gpu/common
-	$(CP)  $(PKG_BUILD_DIR)/tensorflow/./lite/delegates/gpu/common/*.h $(1)/usr/include/tensorflow/./lite/delegates/gpu/common
-	mkdir -p $(1)/usr/include/tensorflow/./lite/delegates/gpu/common/testing
-	$(CP)  $(PKG_BUILD_DIR)/tensorflow/./lite/delegates/gpu/common/testing/*.h $(1)/usr/include/tensorflow/./lite/delegates/gpu/common/testing
-	mkdir -p $(1)/usr/include/tensorflow/./lite/delegates/gpu/common/transformations
-	$(CP)  $(PKG_BUILD_DIR)/tensorflow/./lite/delegates/gpu/common/transformations/*.h $(1)/usr/include/tensorflow/./lite/delegates/gpu/common/transformations
-	mkdir -p $(1)/usr/include/tensorflow/./lite/delegates/gpu/gl
-	$(CP)  $(PKG_BUILD_DIR)/tensorflow/./lite/delegates/gpu/gl/*.h $(1)/usr/include/tensorflow/./lite/delegates/gpu/gl
-	mkdir -p $(1)/usr/include/tensorflow/./lite/delegates/gpu/gl/compiler
-	$(CP)  $(PKG_BUILD_DIR)/tensorflow/./lite/delegates/gpu/gl/compiler/*.h $(1)/usr/include/tensorflow/./lite/delegates/gpu/gl/compiler
-	mkdir -p $(1)/usr/include/tensorflow/./lite/delegates/gpu/gl/converters
-	$(CP)  $(PKG_BUILD_DIR)/tensorflow/./lite/delegates/gpu/gl/converters/*.h $(1)/usr/include/tensorflow/./lite/delegates/gpu/gl/converters
-	mkdir -p $(1)/usr/include/tensorflow/./lite/delegates/gpu/gl/kernels
-	$(CP)  $(PKG_BUILD_DIR)/tensorflow/./lite/delegates/gpu/gl/kernels/*.h $(1)/usr/include/tensorflow/./lite/delegates/gpu/gl/kernels
-	mkdir -p $(1)/usr/include/tensorflow/./lite/delegates/gpu/gl/runtime
-	$(CP)  $(PKG_BUILD_DIR)/tensorflow/./lite/delegates/gpu/gl/runtime/*.h $(1)/usr/include/tensorflow/./lite/delegates/gpu/gl/runtime
-	mkdir -p $(1)/usr/include/tensorflow/./lite/delegates/gpu/gl/workgroups
-	$(CP)  $(PKG_BUILD_DIR)/tensorflow/./lite/delegates/gpu/gl/workgroups/*.h $(1)/usr/include/tensorflow/./lite/delegates/gpu/gl/workgroups
-	mkdir -p $(1)/usr/include/tensorflow/./lite/delegates/gpu/metal
-	$(CP)  $(PKG_BUILD_DIR)/tensorflow/./lite/delegates/gpu/metal/*.h $(1)/usr/include/tensorflow/./lite/delegates/gpu/metal
-	mkdir -p $(1)/usr/include/tensorflow/./lite/delegates/gpu/metal/kernels
-	$(CP)  $(PKG_BUILD_DIR)/tensorflow/./lite/delegates/gpu/metal/kernels/*.h $(1)/usr/include/tensorflow/./lite/delegates/gpu/metal/kernels
-	mkdir -p $(1)/usr/include/tensorflow/./lite/delegates/nnapi
-	$(CP)  $(PKG_BUILD_DIR)/tensorflow/./lite/delegates/nnapi/*.h $(1)/usr/include/tensorflow/./lite/delegates/nnapi
-	mkdir -p $(1)/usr/include/tensorflow/./lite/experimental/resource_variable
-	$(CP)  $(PKG_BUILD_DIR)/tensorflow/./lite/experimental/resource_variable/*.h $(1)/usr/include/tensorflow/./lite/experimental/resource_variable
-	mkdir -p $(1)/usr/include/tensorflow/./lite/kernels
-	$(CP)  $(PKG_BUILD_DIR)/tensorflow/./lite/kernels/*.h $(1)/usr/include/tensorflow/./lite/kernels
-	mkdir -p $(1)/usr/include/tensorflow/./lite/kernels/internal
-	$(CP)  $(PKG_BUILD_DIR)/tensorflow/./lite/kernels/internal/*.h $(1)/usr/include/tensorflow/./lite/kernels/internal
-	mkdir -p $(1)/usr/include/tensorflow/./lite/kernels/internal/optimized
-	$(CP)  $(PKG_BUILD_DIR)/tensorflow/./lite/kernels/internal/optimized/*.h $(1)/usr/include/tensorflow/./lite/kernels/internal/optimized
-	mkdir -p $(1)/usr/include/tensorflow/./lite/kernels/internal/optimized/integer_ops
-	$(CP)  $(PKG_BUILD_DIR)/tensorflow/./lite/kernels/internal/optimized/integer_ops/*.h $(1)/usr/include/tensorflow/./lite/kernels/internal/optimized/integer_ops
-	mkdir -p $(1)/usr/include/tensorflow/./lite/kernels/internal/reference
-	$(CP)  $(PKG_BUILD_DIR)/tensorflow/./lite/kernels/internal/reference/*.h $(1)/usr/include/tensorflow/./lite/kernels/internal/reference
-	mkdir -p $(1)/usr/include/tensorflow/./lite/kernels/internal/reference/integer_ops
-	$(CP)  $(PKG_BUILD_DIR)/tensorflow/./lite/kernels/internal/reference/integer_ops/*.h $(1)/usr/include/tensorflow/./lite/kernels/internal/reference/integer_ops
-	mkdir -p $(1)/usr/include/tensorflow/./lite/nnapi
-	$(CP)  $(PKG_BUILD_DIR)/tensorflow/./lite/nnapi/*.h $(1)/usr/include/tensorflow/./lite/nnapi
-	mkdir -p $(1)/usr/include/tensorflow/./lite/profiling
-	$(CP)  $(PKG_BUILD_DIR)/tensorflow/./lite/profiling/*.h $(1)/usr/include/tensorflow/./lite/profiling
-	mkdir -p $(1)/usr/include/tensorflow/./lite/schema
-	$(CP)  $(PKG_BUILD_DIR)/tensorflow/./lite/schema/*.h $(1)/usr/include/tensorflow/./lite/schema
-	mkdir -p $(1)/usr/include/tensorflow/./lite/schema/builtin_ops_header
-	$(CP)  $(PKG_BUILD_DIR)/tensorflow/./lite/schema/builtin_ops_header/*.h $(1)/usr/include/tensorflow/./lite/schema/builtin_ops_header
+	mkdir -p $(TENSORFLOW_LITE_INCLUDEDIR)
+
+	# Tensorlow
+	mkdir -p $(TENSORFLOW_LITE_INCLUDEDIR)
+	$(CP) -a $(TENSORFLOW_LITE_SUBDIR)/*.h $(TENSORFLOW_LITE_INCLUDEDIR)
+	mkdir -p $(TENSORFLOW_LITE_INCLUDEDIR)/c
+	$(CP) -a $(TENSORFLOW_LITE_SUBDIR)/c/*.h $(TENSORFLOW_LITE_INCLUDEDIR)/c
+	mkdir -p $(TENSORFLOW_LITE_INCLUDEDIR)/nnapi
+	$(CP) -a $(TENSORFLOW_LITE_SUBDIR)/nnapi/*.h $(TENSORFLOW_LITE_INCLUDEDIR)/nnapi
+	mkdir -p $(TENSORFLOW_LITE_INCLUDEDIR)/kernels
+	$(CP) -a $(TENSORFLOW_LITE_SUBDIR)/kernels/*.h $(TENSORFLOW_LITE_INCLUDEDIR)/kernels
+	mkdir -p $(TENSORFLOW_LITE_INCLUDEDIR)/schema
+	$(CP) -a $(TENSORFLOW_LITE_SUBDIR)/schema/*.h $(TENSORFLOW_LITE_INCLUDEDIR)/schema
+	mkdir -p $(TENSORFLOW_LITE_INCLUDEDIR)/core
+	$(CP) -a $(TENSORFLOW_LITE_SUBDIR)/core/*.h $(TENSORFLOW_LITE_INCLUDEDIR)/core
+	mkdir -p $(TENSORFLOW_LITE_INCLUDEDIR)/core/api
+	$(CP) -a $(TENSORFLOW_LITE_SUBDIR)/core/api/*.h $(TENSORFLOW_LITE_INCLUDEDIR)/core/api
+	mkdir -p $(TENSORFLOW_LITE_INCLUDEDIR)/delegates/nnapi
+	$(CP) -a $(TENSORFLOW_LITE_SUBDIR)/delegates/nnapi/*.h $(TENSORFLOW_LITE_INCLUDEDIR)/delegates/nnapi
+	mkdir -p $(TENSORFLOW_LITE_INCLUDEDIR)/experimental/resource
+	$(CP) -a $(TENSORFLOW_LITE_SUBDIR)/experimental/resource/*.h $(TENSORFLOW_LITE_INCLUDEDIR)/experimental/resource
+	
+	# Flatbuffers
+	mkdir -p $(1)/usr/include/flatbuffers
+	$(CP) -a $(PKG_BUILD_DIR)/flatbuffers/include/flatbuffers/*.h $(1)/usr/include/flatbuffers
+
 endef
 
 $(eval $(call BuildPackage,tensorflow-lite))

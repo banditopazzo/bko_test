@@ -12,13 +12,15 @@ PKG_RELEASE:=1
 
 PKG_SOURCE_PROTO:=git
 PKG_SOURCE_URL:=https://github.com/tensorflow/tensorflow.git
-PKG_SOURCE_VERSION:=v2.0.0
+PKG_SOURCE_VERSION:=9663abe4c9037030b0b497c68cc4b2ba991967dd
 PKG_MIRROR_HASH:=08e6bcdccc83a48f52466d3eccca9cbee82e6be7095a6987c507d72394d37552
-PKG_BUILD_DEPENDS:=protobuf abseil flatbuffers eigen farmhash fft2d libdouble-conversion re2 nsync gemmlowp
+
 PKG_LICENSE:=Apache-2.0
 PKG_LICENSE_FILES:=LICENSE
 PKG_MAINTAINER:=Exein <info@exein.io>
 
+CMAKE_SOURCE_SUBDIR:=tensorflow/lite
+PKG_SUPPORTS_IN_SOURCE_BUILD = NO
 
 PKG_INSTALL:=1
 CMAKE_INSTALL:=1
@@ -31,31 +33,41 @@ define Package/tensorflow-lite
 	SECTION:=libs
 	CATEGORY:=Exein
 	TITLE:=TensorFlow Lite is the official solution for running machine learning models on mobile and embedded devices.
-	DEPENDS:=+protobuf +abseil +flatbuffers +farmhash +fft2d +libdouble-conversion +re2 +nsync +gemmlowp +libatomic
+	DEPENDS:=+libatomic
 endef
 
+ARMCC_FLAGS = -funsafe-math-optimizations -ldl -latomic
+ARMCC_FLAGS += -mfloat-abi=softfp
+
 CMAKE_OPTIONS += \
-	-DTFLITE_TESTING=off \
-	-DTFLITE_TYPE=full \
 	-DSYSROOT=$(STAGING_DIR) \
 	-DCMAKE_INSTALL_PREFIX="/usr" \
 	-DCMAKE_COLOR_MAKEFILE=OFF \
 	-DBUILD_DOC=OFF \
+	-DBUILD_DOCS=OFF \
 	-DBUILD_EXAMPLE=OFF \
+	-DBUILD_EXAMPLES=OFF \
 	-DBUILD_TEST=OFF \
+	-DBUILD_TESTS=OFF \
 	-DBUILD_TESTING=OFF \
-	-DBUILD_SHARED_LIBS=ON \
-	-DCMAKE_CXX_FLAGS="$(TARGET_CPPFLAGS) -std=c++11" \
+	-DBUILD_SHARED_LIBS=ON
+
+	-DCMAKE_C_FLAGS="$(TARGET_CPPFLAGS) $(ARMCC_FLAGS) \
+	-DCMAKE_CXX_FLAGS="$(TARGET_CPPFLAGS) $(ARMCC_FLAGS) \
+	-DTFLITE_ENABLE_XNNPACK=OFF \
 
 
 define Package/tensorflow-lite/install
 	$(INSTALL_DIR) $(1)/usr/lib/
-	$(INSTALL_BIN) $(PKG_BUILD_DIR)/tensorflow/lite/*.so $(1)/usr/lib
+	# $(INSTALL_BIN) $(PKG_BUILD_DIR)/tensorflow/lite/*.so $(1)/usr/lib
+	find $(PKG_BUILD_DIR) -name \*.so -exec cp {} $(1)/usr/lib/ \;
+
 endef
 
 define Build/InstallDev
 	$(INSTALL_DIR) $(1)/usr/lib/
-	$(INSTALL_BIN) $(PKG_BUILD_DIR)/tensorflow/lite/*.so $(1)/usr/lib
+	# $(INSTALL_BIN) $(PKG_BUILD_DIR)/tensorflow/lite/*.so $(1)/usr/lib
+	find $(PKG_BUILD_DIR) -name \*.so -exec cp {} $(1)/usr/lib/ \;
 
 	# TODO
 	mkdir -p $(1)/usr/include/tensorflow/./lite

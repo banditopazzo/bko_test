@@ -37,13 +37,7 @@ define Package/tensorflow-lite
 	DEPENDS:=+libstdcpp +libatomic
 endef
 
-
-#ARMCC_FLAGS += -march=armv7-m
-
 CMAKE_OPTIONS += \
-	-DSYSROOT=$(STAGING_DIR) \
-	-DCMAKE_INSTALL_PREFIX="/usr" \
-	-DCMAKE_COLOR_MAKEFILE=OFF \
 	-DBUILD_DOC=OFF \
 	-DBUILD_DOCS=OFF \
 	-DBUILD_EXAMPLE=OFF \
@@ -53,10 +47,8 @@ CMAKE_OPTIONS += \
 	-DBUILD_TESTING=OFF \
 	-DBUILD_SHARED_LIBS=ON
 
-	# -DCMAKE_C_FLAGS="$(TARGET_CPPFLAGS) $(ARMCC_FLAGS)" \
-	# -DCMAKE_CXX_FLAGS="$(TARGET_CPPFLAGS) $(ARMCC_FLAGS)" \
-	# -DTFLITE_ENABLE_XNNPACK=OFF \
-	# -DCMAKE_SYSTEM_PROCESSOR=armv7
+CMAKE_HOST_OPTIONS += \
+	-DBUILD_TESTING=OFF
 
 COMMON_FLAGS = -ldl -latomic
 
@@ -64,29 +56,16 @@ COMMON_FLAGS = -ldl -latomic
 ifeq ($(or $(CONFIG_arm),$(CONFIG_aarch64)),y)
 	ARMCC_FLAGS = -funsafe-math-optimizations # TODO: maybe even in mips
 	ifeq ($(CONFIG_arm_v8),y) # ARMv8
-		ARMCC_FLAGS += -march=armv8-a
 		CMAKE_OPTIONS += -DCMAKE_SYSTEM_PROCESSOR=armv8
 	else
 		CMAKE_OPTIONS += -DTFLITE_ENABLE_XNNPACK=OFF
 		ifeq ($(CONFIG_arm_v7),y) # ARMv7
-			ARMCC_FLAGS += -march=armv7
 			CMAKE_OPTIONS += -DCMAKE_SYSTEM_PROCESSOR=armv7
-			ifeq ($(BR2_ARM_CPU_HAS_NEON),y) # ARMv7A + NEON
-				ARMCC_FLAGS += -mfpu=neon
-			else
-				ARMCC_FLAGS += -mfloat-abi=softfp
-			endif
-		# else ifeq ($(BR2_ARM_CPU_ARMV7M),y) # ARMv7M
-		# 	ARMCC_FLAGS += -march=armv7-m
-		# 	CMAKE_OPTIONS += -DCMAKE_SYSTEM_PROCESSOR=armv7
 		else ifeq ($(CONFIG_arm_v6),y) # ARMv6
-			ARMCC_FLAGS += -march=armv6
 			CMAKE_OPTIONS += -DCMAKE_SYSTEM_PROCESSOR=armv6
 		else ifeq ($(CONFIG_arm_v5),y) # ARMv5
-			ARMCC_FLAGS += -march=armv5
 			CMAKE_OPTIONS += -DCMAKE_SYSTEM_PROCESSOR=armv5
 		else ifeq ($(CONFIG_arm_v4),y) # ARMv4
-			ARMCC_FLAGS += -march=armv4
 			CMAKE_OPTIONS += -DCMAKE_SYSTEM_PROCESSOR=armv4
 		endif
 	endif
@@ -101,7 +80,6 @@ endif
 
 define Package/tensorflow-lite/install
 	$(INSTALL_DIR) $(1)/usr/lib/
-	# $(INSTALL_BIN) $(PKG_BUILD_DIR)/tensorflow/lite/*.so $(1)/usr/lib
 	find $(PKG_BUILD_DIR) -name \*.so -exec cp {} $(1)/usr/lib/ \;
 
 endef
@@ -111,7 +89,6 @@ TENSORFLOW_LITE_INCLUDEDIR = $(1)/usr/include/$(TENSORFLOW_SUBDIR)
 
 define Build/InstallDev
 	$(INSTALL_DIR) $(1)/usr/lib/
-	# $(INSTALL_BIN) $(PKG_BUILD_DIR)/tensorflow/lite/*.so $(1)/usr/lib
 	find $(PKG_BUILD_DIR) -name \*.so -exec cp {} $(1)/usr/lib/ \;
 
 	mkdir -p $(TENSORFLOW_LITE_INCLUDEDIR)

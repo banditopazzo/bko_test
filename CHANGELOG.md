@@ -6,7 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 <hr>
 
-## [0.1.0] - 2021-03-10
+## Unreleased
+
+* CHANGED
+    * Updated libexnl to v0.7.1
 
 <hr>
 

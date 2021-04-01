@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## Unreleased
 
+* ADDED
+    * Kernel 5.4.69 patch
 * CHANGED
     * Updated libexnl to v0.7.1
 

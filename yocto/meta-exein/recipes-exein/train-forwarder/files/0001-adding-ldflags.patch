@@ -1,0 +1,13 @@
+diff --git i/Makefile w/Makefile
+index 16d5563..da996df 100644
+--- i/Makefile
++++ w/Makefile
+@@ -1,7 +1,7 @@
+ NAME=training-forwarder
+ 
+ $(NAME): main.c
+-	$(CC) $(CFLAGS) -o $@ $^
++	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
+ 
+ .PHONY: clean
+ 

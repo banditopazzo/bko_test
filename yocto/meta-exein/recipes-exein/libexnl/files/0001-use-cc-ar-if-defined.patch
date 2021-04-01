@@ -1,0 +1,42 @@
+diff --git c/Makefile w/Makefile
+index 63a5a6b..13b7baa 100644
+--- c/Makefile
++++ w/Makefile
+@@ -3,8 +3,8 @@ VER=v0.7.0
+ GITVER=NONE
+ GITBRH=NONE
+ # ----------- commands
+-CC=gcc
+-AR=ar
++CC?=gcc
++AR?=ar
+ RM=rm
+ MD=mkdir
+ SED=sed
+@@ -65,7 +65,7 @@ $(ODIR)/%.o: %.c $(HDR) $(ODIR) Makefile
+ 	$(CC) $(DEBUGSYM) $(CFLAGS) -fPIC -c -DVERSION_STRING='"$(VERSION_STRING)"' -o $@ $<
+ 
+ $(SHAREDLIB): $(LDIR) $(OBJ)
+-	$(CC) -shared $(CFLAGS) $(OBJ) -o $@
++	$(CC) -shared $(CFLAGS) $(OBJ) -o $@ $(LDFLAGS) -lpthread
+ 	@echo "just built $(VERSION_STRING)"
+ 
+ $(STATICLIB): $(LDIR) $(OBJ)
+@@ -73,13 +73,13 @@ $(STATICLIB): $(LDIR) $(OBJ)
+ 
+ samples: examples/testexnl.c examples/block.c
+ 	mkdir -p bin
+-	$(CC) $(DEBUGSYM) -o $(BIN)/testexnl examples/testexnl.c $(CFLAGS) $(LIBS)
+-	$(CC) $(DEBUGSYM) -o $(BIN)/block examples/block.c $(CFLAGS) $(LIBS)
++	$(CC) $(DEBUGSYM) -o $(BIN)/testexnl examples/testexnl.c $(CFLAGS) $(LDFLAGS) $(LIBS)
++	$(CC) $(DEBUGSYM) -o $(BIN)/block examples/block.c $(CFLAGS) $(LDFLAGS) $(LIBS)
+ 
+ samples-static: examples/testexnl.c examples/block.c
+ 	mkdir -p bin
+-	$(CC) -static $(DEBUGSYM) -o $(BIN)/testexnl examples/testexnl.c $(CFLAGS) $(LIBS)
+-	$(CC) -static $(DEBUGSYM) -o $(BIN)/block examples/block.c $(CFLAGS) $(LIBS)
++	$(CC) -static $(DEBUGSYM) -o $(BIN)/testexnl examples/testexnl.c $(CFLAGS) $(LDFLAGS) $(LIBS)
++	$(CC) -static $(DEBUGSYM) -o $(BIN)/block examples/block.c $(CFLAGS) $(LDFLAGS) $(LIBS)
+ 
+ .PHONY: clean
+ 

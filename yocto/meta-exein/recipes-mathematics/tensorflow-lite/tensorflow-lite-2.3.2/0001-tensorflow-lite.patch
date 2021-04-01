@@ -1,0 +1,342 @@
+diff --git c/Makefile w/Makefile
+new file mode 100644
+index 00000000000..3f73044a66b
+--- /dev/null
++++ w/Makefile
+@@ -0,0 +1 @@
++include ./tensorflow/lite/tools/make/Makefile.internal
+diff --git c/tensorflow/lite/tools/make/Makefile.internal w/tensorflow/lite/tools/make/Makefile.internal
+new file mode 100644
+index 00000000000..1a4d8b3b5fa
+--- /dev/null
++++ w/tensorflow/lite/tools/make/Makefile.internal
+@@ -0,0 +1,315 @@
++# Make uses /bin/sh by default, which is incompatible with the bashisms seen
++# below.
++SHELL := /bin/bash
++
++# Find where we're running from, so we can store generated files here.
++ifeq ($(origin MAKEFILE_DIR), undefined)
++	MAKEFILE_DIR := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
++endif
++
++UNAME_S := $(shell uname -s)
++ifeq ($(UNAME_S),Linux)
++	HOST_OS := linux
++endif
++
++HOST_ARCH := $(shell if uname -m | grep -q i[345678]86; then echo x86_32; else uname -m; fi)
++
++# Override these on the make command line to target a specific architecture. For example:
++# make -f tensorflow/lite/tools/make/Makefile TARGET=rpi TARGET_ARCH=armv7l
++TARGET := $(HOST_OS)
++TARGET_ARCH := $(HOST_ARCH)
++
++
++OBJDIR := $(MAKEFILE_DIR)/gen/obj/
++BINDIR := $(MAKEFILE_DIR)/gen/bin/
++LIBDIR := $(MAKEFILE_DIR)/gen/lib/
++GENDIR := $(MAKEFILE_DIR)/gen/obj/
++
++
++INCLUDES := \
++-I. \
++-I$(MAKEFILE_DIR)/../../../../../ \
++-I$(MAKEFILE_DIR)/../../../../../../ \
++-I$(MAKEFILE_DIR)/downloads/ \
++-I$(MAKEFILE_DIR)/downloads/eigen \
++-I$(MAKEFILE_DIR)/downloads/absl \
++-I$(MAKEFILE_DIR)/downloads/gemmlowp \
++-I$(MAKEFILE_DIR)/downloads/ruy \
++-I$(MAKEFILE_DIR)/downloads/farmhash/src \
++-I$(MAKEFILE_DIR)/downloads/flatbuffers/include \
++-I$(OBJDIR)
++
++# These are the default libraries needed, but they can be added to or
++# overridden by the platform-specific settings in target makefiles.
++LIBS := \
++-lstdc++ \
++-lpthread \
++-lm \
++-lz \
++-ldl
++
++#-latomic
++
++# There are no rules for compiling objects for the host system (since we don't
++# generate things like the protobuf compiler that require that), so all of
++# these settings are for the target compiler.
++CFLAGS := -O3 -DNDEBUG -fPIC $(EXTRA_CFLAGS)
++CXXFLAGS := $(CFLAGS) --std=c++11 $(EXTRA_CXXFLAGS)
++ARFLAGS := -r
++TARGET_TOOLCHAIN_PREFIX :=
++CC_PREFIX :=
++
++ifeq ($(HOST_OS),windows)
++CXXFLAGS += -fext-numeric-literals -D__LITTLE_ENDIAN__
++endif
++
++# This library is the main target for this makefile. It will contain a minimal
++# runtime that can be linked in to other programs.
++LIB_NAME := libtensorflow-lite.a
++
++# Benchmark static library and binary
++BENCHMARK_LIB_NAME := benchmark-lib.a
++BENCHMARK_BINARY_NAME := benchmark_model
++
++# What sources we want to compile, must be kept in sync with the main Bazel
++# build files.
++
++PROFILER_SRCS := \
++	tensorflow/lite/profiling/memory_info.cc \
++	tensorflow/lite/profiling/platform_profiler.cc \
++	tensorflow/lite/profiling/time.cc
++PROFILE_SUMMARIZER_SRCS := \
++	tensorflow/lite/profiling/profile_summarizer.cc \
++	tensorflow/lite/profiling/profile_summary_formatter.cc \
++	tensorflow/core/util/stats_calculator.cc
++
++CMD_LINE_TOOLS_SRCS := \
++	tensorflow/lite/tools/command_line_flags.cc \
++	tensorflow/lite/tools/tool_params.cc
++
++CORE_CC_ALL_SRCS := \
++$(wildcard tensorflow/lite/*.cc) \
++$(wildcard tensorflow/lite/*.c) \
++$(wildcard tensorflow/lite/c/*.c) \
++$(wildcard tensorflow/lite/c/*.cc) \
++$(wildcard tensorflow/lite/core/*.cc) \
++$(wildcard tensorflow/lite/core/api/*.cc) \
++$(wildcard tensorflow/lite/experimental/resource/*.cc) \
++$(wildcard tensorflow/lite/tools/make/downloads/ruy/ruy/*.cc)
++
++ifneq ($(BUILD_TYPE),micro)
++CORE_CC_ALL_SRCS += \
++$(wildcard tensorflow/lite/kernels/*.cc) \
++$(wildcard tensorflow/lite/kernels/internal/*.cc) \
++$(wildcard tensorflow/lite/kernels/internal/optimized/*.cc) \
++$(wildcard tensorflow/lite/kernels/internal/reference/*.cc) \
++$(wildcard tensorflow/lite/tools/optimize/sparsity/*.cc) \
++$(PROFILER_SRCS) \
++tensorflow/lite/tools/make/downloads/farmhash/src/farmhash.cc \
++tensorflow/lite/tools/make/downloads/fft2d/fftsg.c \
++tensorflow/lite/tools/make/downloads/fft2d/fftsg2d.c \
++tensorflow/lite/tools/make/downloads/flatbuffers/src/util.cpp
++CORE_CC_ALL_SRCS += \
++	$(shell find tensorflow/lite/tools/make/downloads/absl/absl/ \
++	             -type f -name \*.cc | grep -v test | grep -v benchmark | grep -v synchronization | grep -v debugging | grep -v hash | grep -v flags | grep -v random)
++endif
++# Remove any duplicates.
++CORE_CC_ALL_SRCS := $(sort $(CORE_CC_ALL_SRCS))
++CORE_CC_EXCLUDE_SRCS := \
++$(wildcard tensorflow/lite/*test.cc) \
++$(wildcard tensorflow/lite/*/*test.cc) \
++$(wildcard tensorflow/lite/*/*/benchmark.cc) \
++$(wildcard tensorflow/lite/*/*/example*.cc) \
++$(wildcard tensorflow/lite/*/*/test*.cc) \
++$(wildcard tensorflow/lite/*/*/*test.cc) \
++$(wildcard tensorflow/lite/*/*/*tool.cc) \
++$(wildcard tensorflow/lite/*/*/*/benchmark.cc) \
++$(wildcard tensorflow/lite/*/*/*/example*.cc) \
++$(wildcard tensorflow/lite/*/*/*/test*.cc) \
++$(wildcard tensorflow/lite/*/*/*/*test.cc) \
++$(wildcard tensorflow/lite/*/*/*/*tool.cc) \
++$(wildcard tensorflow/lite/*/*/*/*/*/benchmark.cc) \
++$(wildcard tensorflow/lite/*/*/*/*/*/example*.cc) \
++$(wildcard tensorflow/lite/*/*/*/*/*/test*.cc) \
++$(wildcard tensorflow/lite/*/*/*/*/*/*test.cc) \
++$(wildcard tensorflow/lite/*/*/*/*/*/*tool.cc) \
++$(wildcard tensorflow/lite/kernels/*test_main.cc) \
++$(wildcard tensorflow/lite/kernels/*test_util*.cc) \
++tensorflow/lite/tflite_with_xnnpack.cc 
++
++BUILD_WITH_MMAP ?= true
++ifeq ($(BUILD_TYPE),micro)
++	BUILD_WITH_MMAP=false
++endif
++ifeq ($(BUILD_TYPE),windows)
++	BUILD_WITH_MMAP=false
++endif
++ifeq ($(BUILD_WITH_MMAP),true)
++	CORE_CC_EXCLUDE_SRCS += tensorflow/lite/mmap_allocation.cc
++else
++	CORE_CC_EXCLUDE_SRCS += tensorflow/lite/mmap_allocation_disabled.cc
++endif
++
++BUILD_WITH_NNAPI ?= false
++ifeq ($(BUILD_TYPE),micro)
++	BUILD_WITH_NNAPI=false
++endif
++ifeq ($(TARGET),windows)
++	BUILD_WITH_NNAPI=false
++endif
++ifeq ($(TARGET),ios)
++	BUILD_WITH_NNAPI=false
++endif
++ifeq ($(TARGET),rpi)
++	BUILD_WITH_NNAPI=false
++endif
++ifeq ($(TARGET),generic-aarch64)
++	BUILD_WITH_NNAPI=false
++endif
++ifeq ($(BUILD_WITH_NNAPI),true)
++	CORE_CC_ALL_SRCS += tensorflow/lite/delegates/nnapi/nnapi_delegate.cc
++	CORE_CC_ALL_SRCS += tensorflow/lite/delegates/nnapi/quant_lstm_sup.cc
++	CORE_CC_ALL_SRCS += tensorflow/lite/nnapi/nnapi_implementation.cc
++	CORE_CC_ALL_SRCS += tensorflow/lite/nnapi/nnapi_util.cc
++	LIBS += -lrt
++else
++	CORE_CC_ALL_SRCS += tensorflow/lite/delegates/nnapi/nnapi_delegate_disabled.cc
++	CORE_CC_ALL_SRCS += tensorflow/lite/nnapi/nnapi_implementation_disabled.cc
++endif
++
++# Temporary fix for ruy compilation error.
++# TODO(b/158800055): Remove this hack once the ruy version is correctly bumped.
++CORE_CC_EXCLUDE_SRCS += tensorflow/lite/tools/make/downloads/ruy/ruy/prepare_packed_matrices.cc
++
++
++BUILD_WITH_RUY ?= false
++ifeq ($(TARGET_ARCH),aarch64)
++	BUILD_WITH_RUY=true
++endif
++ifeq ($(BUILD_WITH_RUY),true)
++
++  CXXFLAGS += -DTFLITE_WITH_RUY
++endif
++
++
++BUILD_WITH_RUY_PROFILER ?= false
++ifeq ($(BUILD_WITH_RUY_PROFILER),true)
++  CORE_CC_ALL_SRCS += tensorflow/lite/tools/make/downloads/ruy/ruy/profiler/instrumentation.cc
++  CORE_CC_ALL_SRCS += tensorflow/lite/tools/make/downloads/ruy/ruy/profiler/profiler.cc
++  CORE_CC_ALL_SRCS += tensorflow/lite/tools/make/downloads/ruy/ruy/profiler/treeview.cc
++  CXXFLAGS += -DRUY_PROFILER
++endif
++
++# Not to include XNNPACK.
++CXXFLAGS += -DTFLITE_WITHOUT_XNNPACK
++
++BUILD_WITH_NNAPI ?= false
++
++CORE_CC_EXCLUDE_SRCS += tensorflow/lite/minimal_logging_android.cc
++CORE_CC_EXCLUDE_SRCS += tensorflow/lite/minimal_logging_ios.cc
++
++# Filter out all the excluded files.
++TF_LITE_CC_SRCS := $(filter-out $(CORE_CC_EXCLUDE_SRCS), $(CORE_CC_ALL_SRCS))
++
++# Benchmark sources
++BENCHMARK_SRCS_DIR := tensorflow/lite/tools/benchmark
++EVALUATION_UTILS_SRCS := \
++  tensorflow/lite/tools/evaluation/utils.cc
++BENCHMARK_ALL_SRCS := $(TF_LITE_CC_SRCS) \
++	$(wildcard $(BENCHMARK_SRCS_DIR)/*.cc) \
++	$(PROFILE_SUMMARIZER_SRCS) \
++	$(CMD_LINE_TOOLS_SRCS) \
++	$(EVALUATION_UTILS_SRCS)
++
++BENCHMARK_SRCS := $(filter-out \
++	$(wildcard $(BENCHMARK_SRCS_DIR)/*_test.cc) \
++	$(BENCHMARK_SRCS_DIR)/benchmark_plus_flex_main.cc, \
++	$(BENCHMARK_ALL_SRCS))
++
++# These target-specific makefiles should modify or replace options like
++# CXXFLAGS or LIBS to work for a specific targetted architecture. All logic
++# based on platforms or architectures should happen within these files, to
++# keep this main makefile focused on the sources and dependencies.
++#include $(wildcard $(MAKEFILE_DIR)/targets/*_makefile.inc)
++
++ALL_SRCS := \
++	$(PROFILER_SRCS) \
++	$(PROFILER_SUMMARIZER_SRCS) \
++	$(TF_LITE_CC_SRCS) \
++	$(BENCHMARK_SRCS) \
++	$(CMD_LINE_TOOLS_SRCS)
++
++# Where compiled objects are stored.
++
++LIB_PATH := $(LIBDIR)$(LIB_NAME)
++BENCHMARK_LIB := $(LIBDIR)$(BENCHMARK_LIB_NAME)
++BENCHMARK_BINARY := $(BINDIR)$(BENCHMARK_BINARY_NAME)
++
++LIB_OBJS := $(addprefix $(OBJDIR), \
++$(patsubst %.cc,%.o,$(patsubst %.c,%.o,$(patsubst %.cpp,%.o,$(TF_LITE_CC_SRCS)))))
++
++BENCHMARK_OBJS := $(addprefix $(OBJDIR), \
++$(patsubst %.cc,%.o,$(patsubst %.c,%.o,$(patsubst %.cpp,%.o,$(BENCHMARK_SRCS)))))
++
++# For normal manually-created TensorFlow Lite C++ source files.
++$(OBJDIR)%.o: %.cc
++	@mkdir -p $(dir $@)
++	$(CXX) $(CXXFLAGS) $(INCLUDES) -c $< -o $@
++# For normal manually-created TensorFlow Lite C source files.
++$(OBJDIR)%.o: %.c
++	@mkdir -p $(dir $@)
++	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
++$(OBJDIR)%.o: %.cpp
++	@mkdir -p $(dir $@)
++	$(CXX) $(CXXFLAGS) $(INCLUDES) -c $< -o $@
++
++# The target that's compiled if there's no command-line arguments.
++all: $(LIB_PATH) $(BENCHMARK_BINARY)
++
++# The target that's compiled for micro-controllers
++micro: $(LIB_PATH)
++
++# Hack for generating schema file bypassing flatbuffer parsing
++tensorflow/lite/schema/schema_generated.h:
++	@cp -u tensorflow/lite/schema/schema_generated.h.OPENSOURCE tensorflow/lite/schema/schema_generated.h
++
++# Gathers together all the objects we've compiled into a single '.a' archive.
++$(LIB_PATH): tensorflow/lite/schema/schema_generated.h $(LIB_OBJS)
++	@mkdir -p $(dir $@)
++	$(AR) $(ARFLAGS) $(LIB_PATH) $(LIB_OBJS)
++
++lib: $(LIB_PATH)
++
++$(BENCHMARK_LIB) : $(LIB_PATH) $(BENCHMARK_OBJS)
++	@mkdir -p $(dir $@)
++	$(AR) $(ARFLAGS) $(BENCHMARK_LIB) $(LIB_OBJS) $(BENCHMARK_OBJS)
++
++benchmark_lib: $(BENCHMARK_LIB)
++
++$(BENCHMARK_BINARY) : $(BENCHMARK_LIB)
++	@mkdir -p $(dir $@)
++	$(CXX) $(CXXFLAGS) $(INCLUDES) \
++	-o $(BENCHMARK_BINARY) \
++	$(LIBFLAGS) $(BENCHMARK_LIB) $(LDFLAGS) $(LIBS)
++
++benchmark: $(BENCHMARK_BINARY)
++
++
++libdir:
++	@echo $(LIBDIR)
++
++# Gets rid of all generated files.
++clean:
++	rm -rf $(MAKEFILE_DIR)/gen
++
++# Gets rid of target files only, leaving the host alone. Also leaves the lib
++# directory untouched deliberately, so we can persist multiple architectures
++# across builds for iOS and Android.
++cleantarget:
++	rm -rf $(OBJDIR)
++	rm -rf $(BINDIR)
++
++$(DEPDIR)/%.d: ;
++.PRECIOUS: $(DEPDIR)/%.d
++
++-include $(patsubst %,$(DEPDIR)/%.d,$(basename $(ALL_SRCS)))
+diff --git c/tensorflow/lite/tools/make/download_dependencies.sh w/tensorflow/lite/tools/make/download_dependencies.sh
+index 5b0fd47bcf4..2e05372e8aa 100755
+--- c/tensorflow/lite/tools/make/download_dependencies.sh
++++ w/tensorflow/lite/tools/make/download_dependencies.sh
+@@ -79,7 +79,8 @@ download_and_extract() {
+   rm -rf ${dir}/*  # Delete existing files.
+   tempdir=$(mktemp -d)
+   filepath="${tempdir}/$(basename ${url})"
+-  curl -Lo ${filepath} ${url}
++  wget -qO ${filepath} "${url}"
++
+   if [ -n "${sha256}" ]; then
+     echo "checking sha256 of ${dir}"
+     echo "${sha256}  ${filepath}" | sha256sum -c

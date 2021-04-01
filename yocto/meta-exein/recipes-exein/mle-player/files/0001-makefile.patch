@@ -1,0 +1,13 @@
+diff --git c/Makefile w/Makefile
+index d8a7761..e7ba4dd 100644
+--- c/Makefile
++++ w/Makefile
+@@ -12,7 +12,7 @@ PROJECT_SOURCES = mle-player.cc
+ all: $(PROJECT_BINARY_NAME)
+ 
+ $(PROJECT_BINARY_NAME):	$(PROJECT_SOURCES)
+-	$(CXX) -std=c++14 -funwind-tables $(CXXFLAGS) $(PROJECT_SOURCES) -o $(PROJECT_BINARY_NAME) -ltensorflow-lite -lexnl
++	$(CXX) -std=c++14 -funwind-tables $(CXXFLAGS) $(PROJECT_SOURCES) -o $(PROJECT_BINARY_NAME) $(LDFLAGS) -ltensorflow-lite -lexnl -lpthread -ldl -lrt
+ 
+ 
+ clean:

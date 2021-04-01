@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 <hr>
 
-## Unreleased
+## [0.2.0] - 2021-04-01
 
 * ADDED
     * Kernel 5.4.69 patch

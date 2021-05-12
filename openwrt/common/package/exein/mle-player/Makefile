@@ -34,7 +34,7 @@ endef
 
 define Package/mle-player/install
 	$(INSTALL_DIR) $(1)/usr/bin
-	$(INSTALL_BIN) $(PKG_BUILD_DIR)/mle-player $(1)/usr/bin/mle-player
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/mle-player $(1)/usr/bin/exein-mle
 
 	$(INSTALL_DIR) $(1)/etc/exein
 endef

@@ -25,6 +25,6 @@ do_install() {
 	install -d ${D}${bindir}
 	cp -r \
 		${S}/training-forwarder \
-		${D}${bindir}
+		${D}${bindir}/exein-forward
 }
 

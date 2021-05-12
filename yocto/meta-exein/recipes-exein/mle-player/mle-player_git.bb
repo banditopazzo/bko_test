@@ -27,7 +27,7 @@ do_install() {
 	install -d ${D}${bindir}
 	cp -r \
 		${S}/mle-player \
-		${D}${bindir}
+		${D}${bindir}/exein-mle
 }
 
 

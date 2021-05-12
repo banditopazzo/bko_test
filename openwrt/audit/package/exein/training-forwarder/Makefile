@@ -35,7 +35,7 @@ endef
 
 define Package/training-forwarder/install
 	$(INSTALL_DIR) $(1)/usr/bin
-	$(INSTALL_BIN) $(PKG_BUILD_DIR)/training-forwarder $(1)/usr/bin/training-forwarder
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/training-forwarder $(1)/usr/bin/exein-forward
 endef
 
 $(eval $(call BuildPackage,training-forwarder))

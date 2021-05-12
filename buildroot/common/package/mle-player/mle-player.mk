@@ -10,7 +10,7 @@ endef
 
 
 define MLE_PLAYER_INSTALL_TARGET_CMDS
-	$(INSTALL) -D -m 0755 $(@D)/mle-player $(TARGET_DIR)/usr/bin/mle-player
+	$(INSTALL) -D -m 0755 $(@D)/mle-player $(TARGET_DIR)/usr/bin/exein-mle
 	mkdir -p $(TARGET_DIR)/etc/exein
 endef
 

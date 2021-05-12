@@ -13,8 +13,7 @@ endef
 
 
 define TRAINING_FORWARDER_INSTALL_TARGET_CMDS
-	$(INSTALL) -D -m 0755 $(@D)/training-forwarder $(TARGET_DIR)/usr/bin/training-forwarder
-endef
+	$(INSTALL) -D -m 0755 $(@D)/training-forwarder $(TARGET_DIR)/usr/bin/exein-forward
 
 
 $(eval $(generic-package))

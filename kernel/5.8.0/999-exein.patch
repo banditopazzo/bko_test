@@ -1,24 +1,8 @@
 --- a/fs/binfmt_elf.c
 +++ b/fs/binfmt_elf.c
-@@ -45,6 +45,15 @@
- #include <asm/param.h>
- #include <asm/page.h>
- 
-+#ifdef CONFIG_SECURITY_EXEIN
-+#include <linux/version.h>
-+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
-+#define KERNEL_READ_EX(file,buf,count,offset) kernel_read(file,buf,count,offset)
-+#else
-+#define KERNEL_READ_EX(file,buf,count,offset) kernel_read(file,*offset,(char *)buf,count)
-+#endif
-+#endif
-+
- #ifndef user_long_t
- #define user_long_t long
- #endif
-@@ -691,6 +700,12 @@
- 	} *loc;
+@@ -815,6 +815,12 @@
  	struct arch_elf_state arch_state = INIT_ARCH_ELF_STATE;
+ 	struct mm_struct *mm;
  	struct pt_regs *regs;
 +#ifdef CONFIG_SECURITY_EXEIN
 +	loff_t shdrpos,tmppos;
@@ -27,26 +11,26 @@
 +	void *tmp;
 +#endif
  
- 	loc = kmalloc(sizeof(*loc), GFP_KERNEL);
- 	if (!loc) {
-@@ -719,6 +734,30 @@
+ 	retval = -ENOEXEC;
+ 	/* First of all, some simple consistency checks */
+@@ -834,6 +840,30 @@
  	if (!elf_phdata)
  		goto out;
  
 +#ifdef CONFIG_SECURITY_EXEIN
 +	if (current->process_tag==0){
-+		if (loc->elf_ex.e_shentsize != 0) {
-+			shdrpos=(loff_t) loc->elf_ex.e_shoff;
-+			shdr  = kmalloc(loc->elf_ex.e_shentsize * loc->elf_ex.e_shnum, GFP_KERNEL);
-+			KERNEL_READ_EX(bprm->file, shdr, loc->elf_ex.e_shentsize * loc->elf_ex.e_shnum, &shdrpos);
-+			strtb = kmalloc(shdr[loc->elf_ex.e_shstrndx].sh_size, GFP_KERNEL);
-+			shdrpos=(loff_t) shdr[loc->elf_ex.e_shstrndx].sh_offset;
-+			KERNEL_READ_EX(bprm->file, strtb, shdr[loc->elf_ex.e_shstrndx].sh_size, &shdrpos);
-+			for (i=0; i< loc->elf_ex.e_shnum; i++){
++		if (elf_ex->e_shentsize != 0) {
++			shdrpos=(loff_t) elf_ex->e_shoff;
++			shdr  = kmalloc(elf_ex->e_shentsize * elf_ex->e_shnum, GFP_KERNEL);
++			kernel_read(bprm->file, shdr, elf_ex->e_shentsize * elf_ex->e_shnum, &shdrpos);
++			strtb = kmalloc(shdr[elf_ex->e_shstrndx].sh_size, GFP_KERNEL);
++			shdrpos=(loff_t) shdr[elf_ex->e_shstrndx].sh_offset;
++			kernel_read(bprm->file, strtb, shdr[elf_ex->e_shstrndx].sh_size, &shdrpos);
++			for (i=0; i< elf_ex->e_shnum; i++){
 +				if (strcmp((strtb+ (shdr + i)->sh_name),".exein")==0){
 +					tmp=kmalloc(shdr[i].sh_size, GFP_KERNEL);
 +					tmppos=(loff_t) shdr[i].sh_offset;
-+					KERNEL_READ_EX(bprm->file, tmp, shdr[i].sh_size, &tmppos);
++					kernel_read(bprm->file, tmp, shdr[i].sh_size, &tmppos);
 +					current->process_tag=*((uint16_t *) tmp);
 +					kfree(tmp);
 +					}
@@ -58,13 +42,13 @@
 +#endif
 +
  	elf_ppnt = elf_phdata;
- 	for (i = 0; i < loc->elf_ex.e_phnum; i++, elf_ppnt++) {
+ 	for (i = 0; i < elf_ex->e_phnum; i++, elf_ppnt++) {
  		char *elf_interpreter;
 --- a/kernel/exit.c
 +++ b/kernel/exit.c
-@@ -68,6 +68,9 @@
+@@ -67,6 +67,9 @@
+ #include <linux/uaccess.h>
  #include <asm/unistd.h>
- #include <asm/pgtable.h>
  #include <asm/mmu_context.h>
 +#ifdef CONFIG_SECURITY_EXEIN 
 +#include <exein.h>
@@ -72,7 +56,7 @@
  
  static void __unhash_process(struct task_struct *p, bool group_dead)
  {
-@@ -859,6 +862,10 @@
+@@ -853,6 +856,10 @@
  	exit_rcu();
  	exit_tasks_rcu_finish();
  
@@ -85,7 +69,7 @@
  }
 --- a/drivers/Makefile
 +++ b/drivers/Makefile
-@@ -63,6 +63,9 @@
+@@ -64,6 +64,9 @@
  
  obj-$(CONFIG_CONNECTOR)		+= connector/
  
@@ -95,13 +79,22 @@
  # i810fb and intelfb depend on char/agp/
  obj-$(CONFIG_FB_I810)           += video/fbdev/i810/
  obj-$(CONFIG_FB_INTEL)          += video/fbdev/intelfb/
+@@ -188,3 +191,5 @@
+ obj-$(CONFIG_INTERCONNECT)	+= interconnect/
+ obj-$(CONFIG_COUNTER)		+= counter/
+ obj-$(CONFIG_MOST)		+= most/
++
++obj-$(CONFIG_EXDBG)             += exdbg/
 --- a/drivers/Kconfig
 +++ b/drivers/Kconfig
-@@ -228,4 +228,6 @@
- 
+@@ -235,4 +235,9 @@
  source "drivers/counter/Kconfig"
  
+ source "drivers/most/Kconfig"
++
 +source "drivers/exein_interface/Kconfig"
++
++source "drivers/exdbg/Kconfig"
 +
  endmenu
 --- a/drivers/exein_interface/exein_interface.c
@@ -290,32 +283,46 @@
 +        This driver provides Exein proc interface
 --- a/security/Makefile
 +++ b/security/Makefile
-@@ -9,6 +9,7 @@
- subdir-$(CONFIG_SECURITY_TOMOYO)        += tomoyo
+@@ -6,13 +6,14 @@
+ obj-$(CONFIG_KEYS)			+= keys/
+ subdir-$(CONFIG_SECURITY_SELINUX)	+= selinux
+ subdir-$(CONFIG_SECURITY_SMACK)		+= smack
+-subdir-$(CONFIG_SECURITY_TOMOYO)        += tomoyo
++subdir-$(CONFIG_SECURITY_TOMOYO)	+= tomoyo
  subdir-$(CONFIG_SECURITY_APPARMOR)	+= apparmor
  subdir-$(CONFIG_SECURITY_YAMA)		+= yama
-+subdir-$(CONFIG_SECURITY_EXEIN)		+= exein
  subdir-$(CONFIG_SECURITY_LOADPIN)	+= loadpin
- subdir-$(CONFIG_SECURITY_SAFESETID)    += safesetid
+-subdir-$(CONFIG_SECURITY_SAFESETID)    += safesetid
++subdir-$(CONFIG_SECURITY_SAFESETID)	+= safesetid
  subdir-$(CONFIG_SECURITY_LOCKDOWN_LSM)	+= lockdown
-@@ -26,6 +27,7 @@
- obj-$(CONFIG_SECURITY_TOMOYO)		+= tomoyo/
+ subdir-$(CONFIG_BPF_LSM)		+= bpf
++subdir-$(CONFIG_SECURITY_EXEIN)		+= exein
+ 
+ # always enable default capabilities
+ obj-y					+= commoncap.o
+@@ -28,10 +29,11 @@
  obj-$(CONFIG_SECURITY_APPARMOR)		+= apparmor/
  obj-$(CONFIG_SECURITY_YAMA)		+= yama/
-+obj-$(CONFIG_SECURITY_EXEIN)		+= exein/
  obj-$(CONFIG_SECURITY_LOADPIN)		+= loadpin/
- obj-$(CONFIG_SECURITY_SAFESETID)       += safesetid/
+-obj-$(CONFIG_SECURITY_SAFESETID)       += safesetid/
++obj-$(CONFIG_SECURITY_SAFESETID)	+= safesetid/
  obj-$(CONFIG_SECURITY_LOCKDOWN_LSM)	+= lockdown/
+ obj-$(CONFIG_CGROUPS)			+= device_cgroup.o
+ obj-$(CONFIG_BPF_LSM)			+= bpf/
++obj-$(CONFIG_SECURITY_EXEIN)		+= exein/
+ 
+ # Object integrity file lists
+ subdir-$(CONFIG_INTEGRITY)		+= integrity
 --- a/security/Kconfig
 +++ b/security/Kconfig
-@@ -236,6 +236,7 @@
- source "security/apparmor/Kconfig"
- source "security/loadpin/Kconfig"
- source "security/yama/Kconfig"
-+source "security/exein/Kconfig"
+@@ -239,6 +239,7 @@
  source "security/safesetid/Kconfig"
  source "security/lockdown/Kconfig"
  
++source "security/exein/Kconfig"
+ source "security/integrity/Kconfig"
+ 
+ choice
 --- a/security/exein/exein_struct_mappings.c
 +++ b/security/exein/exein_struct_mappings.c
 @@ -0,0 +1,270 @@
@@ -453,8 +460,8 @@
 +    features_arr[(*index_p)++] = (exein_feature_t) (*input).tgid;
 +    features_arr[(*index_p)++] = (exein_feature_t) (*input).stack;
 +    //4.14.151
-+//    features_arr[(*index_p)++] = (exein_feature_t) (*input).usage.counter;    /* indicates how many object are referencing this task */
-+    features_arr[(*index_p)++] = (exein_feature_t) (*input).static_prio;           /* static_prio is the starting priority which is not affected by the scheduler dynamics */
++    //features_arr[(*index_p)++] = (exein_feature_t) (*input).usage.counter;    /* indicates how many object are referencing this task */
++	  features_arr[(*index_p)++] = (exein_feature_t) (*input).static_prio;           /* static_prio is the starting priority which is not affected by the scheduler dynamics */
 +    //features_arr[(*index_p)++] = (exein_feature_t) (*input).thread_pid->count.counter;
 +
 +    // TODO: Map the whole path?
@@ -591,7 +598,7 @@
 +//void exein_map_fs_context_to_features(const struct fs_context * input, size_t* index_p, exein_feature_t* features_arr){}
 --- a/security/exein/exein_lsm.c
 +++ b/security/exein/exein_lsm.c
-@@ -0,0 +1,3273 @@
+@@ -0,0 +1,3270 @@
 +/*
 + * exein Linux Security Module
 + *
@@ -900,6 +907,7 @@
 +	if (data[EXEIN_PROT_TAG_POS]!=0) printk(KERN_INFO "ExeinLSM - Commit data for tag %d\n", data[5]);
 +#endif
 +	if (data[EXEIN_PROT_TAG_POS]!=0){
++		printk(KERN_INFO "ExeinLSM - process[%d] tag [%d] just passed\n", current->pid, current->process_tag);
 +		switch (exein_mode){
 +			case EXEIN_ONREQUEST:
 +				pid_found=0;
@@ -1151,7 +1159,7 @@
 +
 +#ifdef EXEIN_CAPABLE_SWITCH
 +//4.14.151
-+static int exein_capable(const struct cred *cred, struct user_namespace *ns, int cap, int opts )
++static int exein_capable(const struct cred *cred, struct user_namespace *ns, int cap, unsigned int opts )
 +{
 +	exein_feature_t NNInput[EXEIN_NN_MAX_SIZE];
 +
@@ -3356,7 +3364,7 @@
 +
 +#ifdef EXEIN_TASK_KILL_SWITCH
 +//4.14.151
-+static int exein_task_kill(struct task_struct * arg1, struct siginfo * arg2, int arg3, const struct cred *cred)
++static int exein_task_kill(struct task_struct * arg1, struct kernel_siginfo * arg2, int arg3, const struct cred *cred)
 +{
 +	exein_feature_t NNInput[EXEIN_NN_MAX_SIZE];
 +
@@ -3848,7 +3856,7 @@
 +static int __init exein_init(void)
 +{
 +	pr_info("ExeinLSM - lsm is active: seed [%d]\n",SEEDRND);
-+        exein_payload_process_ptr	=	&exein_payload_process;
++	exein_payload_process_ptr	=	&exein_payload_process;
 +	exein_register_status_get_ptr	=	&exein_register_status_get;
 +	exein_pid_status_get_ptr	=	&exein_pid_status_get;
 +	security_add_hooks(exein_hooks, ARRAY_SIZE(exein_hooks), "exein");
@@ -3857,17 +3865,13 @@
 +	return 0;
 +}
 +
-+//4.14.151
-+//security_initcall(exein_init);
-+
-+//5.1.11
-+ DEFINE_LSM(exein) = {
-+ 	.name = "exein",
-+ 	.init = exein_init,
++DEFINE_LSM(exein) = {
++	.name = "exein",
++	.init = exein_init,
 +};
 --- a/security/exein/exein_nn_defs_parts.h
 +++ b/security/exein/exein_nn_defs_parts.h
-@@ -0,0 +1,103 @@
+@@ -0,0 +1,106 @@
 +/*
 +   ------
 +  / *    *
@@ -3876,101 +3880,104 @@
 + \   *  *  *
 +  \ *    *
 +   ------
-+Exein
++E			xein
 +*/
 +#include <uapi/linux/capability.h>
 +
-+#define	DUMMY_STRING_MAX_LENGTH     0
++#define DUMMY_STRING_MAX_LENGTH		0
 +
-+#define CURRENT_PROCESS_FEATURES    1
-+#define BOOL                        1
-+#define CHAR                        1
-+#define CONST_CHAR                  CHAR
-+#define CONST_STRUCT_CRED           STRUCT_CRED
-+#define CONST_STRUCT_KERNEL_CAP_T   KERNEL_CAP_T
-+#define CONST_STRUCT_PATH           1 //temporary
-+#define CONST_STRUCT_QSTR           STRUCT_QSTR
-+#define CONST_STRUCT_SUPER_BLOCK    1 //temporary
-+#define CONST_STRUCT_TIMESPEC64     1 //temporary
-+#define CONST_STRUCT_TIMEZONE       1 //temporary
-+#define CONST_VOID                  1 //temporary
-+#define CONST_STRUCT_REQUEST_SOCK   STRUCT_REQUEST_SOCK
-+#define CONST_STRUCT_FLOWI          STRUCT_FLOWI
-+#define CONST_STRUCT_SOCK           STRUCT_SOCK
-+#define UNION_BPF_ATTR              1 //temporary
-+#define DEV_T                       1 //temporary
-+#define ENUM_KERNEL_LOAD_DATA_ID    1 //temporary
-+#define ENUM_KERNEL_READ_FILE_ID    1 //temporary
-+#define GFP_T                       1 //temporary
-+#define INT                         1
-+#define KERNEL_CAP_T                2 //_KERNEL_CAPABILITY_U32S
-+#define KGID_T                      1 //temporary
-+#define KUID_T                      1 //temporary
-+#define LOFF_T                      1 //temporary
-+#define LONG                        1 //temporary
-+#define PID_T                       1 //temporary
-+#define SHORT                       1 //temporary
-+#define SIZE_T                      1 //temporary
-+#define KEY_REF_T                   1 //temporary
-+#define FMODE_T                     1 //temporary
-+#define STRUCT_CRED                 9
-+#define STRUCT_DENTRY               1 //temporary was 0
-+#define STRUCT_FILE                 STRUCT_DENTRY + STRUCT_INODE + STRUCT_FOWN_STRUCT + 1
-+#define STRUCT_FOWN_STRUCT          1
-+#define STRUCT_FS_CONTEXT           DUMMY_STRING_MAX_LENGTH + STRUCT_DENTRY + STRUCT_USER_NAMESPACE + STRUCT_CRED + DUMMY_STRING_MAX_LENGTH + DUMMY_STRING_MAX_LENGTH + 6
-+#define STRUCT_FS_PARAMETER         1 //temporary was 0
-+#define STRUCT_IATTR                5
-+#define STRUCT_INODE                7
++#define CURRENT_PROCESS_FEATURES	1
++#define BOOL				1
++#define CHAR				1
++#define CONST_CHAR			CHAR
++#define CONST_STRUCT_CRED		STRUCT_CRED
++#define CONST_STRUCT_KERNEL_CAP_T	KERNEL_CAP_T
++#define CONST_STRUCT_PATH		1 //temporary
++#define CONST_STRUCT_QSTR		STRUCT_QSTR
++#define CONST_STRUCT_SUPER_BLOCK	1 //temporary
++#define CONST_STRUCT_TIMESPEC64		1 //temporary
++#define CONST_STRUCT_TIMEZONE		1 //temporary
++#define CONST_VOID			1 //temporary
++#define CONST_STRUCT_REQUEST_SOCK	STRUCT_REQUEST_SOCK
++#define CONST_STRUCT_FLOWI		STRUCT_FLOWI
++#define CONST_STRUCT_SOCK		STRUCT_SOCK
++#define UNION_BPF_ATTR			1 //temporary
++#define DEV_T				1 //temporary
++#define ENUM_KERNEL_LOAD_DATA_ID	1 //temporary
++#define ENUM_KERNEL_READ_FILE_ID	1 //temporary
++#define GFP_T				1 //temporary
++#define INT				1
++#define KERNEL_CAP_T			2 //_KERNEL_CAPABILITY_U32S
++#define KGID_T				1 //temporary
++#define KUID_T				1 //temporary
++#define LOFF_T				1 //temporary
++#define LONG				1 //temporary
++#define PID_T				1 //temporary
++#define SHORT				1 //temporary
++#define SIZE_T				1 //temporary
++#define KEY_REF_T			1 //temporary
++#define FMODE_T				1 //temporary
++#define STRUCT_CRED			9
++#define STRUCT_DENTRY			1 //temporary was 0
++#define STRUCT_FILE			STRUCT_DENTRY + STRUCT_INODE + STRUCT_FOWN_STRUCT + 1
++#define STRUCT_FOWN_STRUCT		1
++#define STRUCT_FS_CONTEXT		DUMMY_STRING_MAX_LENGTH + STRUCT_DENTRY + STRUCT_USER_NAMESPACE + STRUCT_CRED + DUMMY_STRING_MAX_LENGTH + DUMMY_STRING_MAX_LENGTH + 6
++#define STRUCT_FS_PARAMETER		1 //temporary was 0
++#define STRUCT_IATTR			5
++#define STRUCT_INODE			7
 +//4.14.151
-+#define STRUCT_SIGINFO       1 //temporary
-+#define STRUCT_KERN_IPC_PERM        1 //temporary
-+#define STRUCT_LINUX_BINPRM         1 //temporary was 0
-+#define STRUCT_MM_STRUCT            1 //temporary
-+#define STRUCT_MSG_MSG              1 //temporary
-+#define STRUCT_QSTR                 1 //temporary was 0
-+#define STRUCT_RLIMIT               1 //temporary
-+#define STRUCT_SEQ_FILE             1 //temporary
-+#define STRUCT_SUPER_BLOCK          1 //temporary
-+#define STRUCT_TASK_STRUCT         10
-+#define STRUCT_USER_NAMESPACE       3
-+#define STRUCT_VFSMOUNT             1 //temporary
-+#define STRUCT_VM_AREA_STRUCT      20
-+#define STRUCT_AUDIT_KRULE          1 //temporary
++#define STRUCT_SIGINFO			1 //temporary
++#define STRUCT_KERN_IPC_PERM		1 //temporary
++#define STRUCT_LINUX_BINPRM		1 //temporary was 0
++#define STRUCT_MM_STRUCT		1 //temporary
++#define STRUCT_MSG_MSG			1 //temporary
++#define STRUCT_QSTR			1 //temporary was 0
++#define STRUCT_RLIMIT			1 //temporary
++#define STRUCT_SEQ_FILE			1 //temporary
++#define STRUCT_SUPER_BLOCK		1 //temporary
++#define STRUCT_TASK_STRUCT		10
++#define STRUCT_USER_NAMESPACE		3
++#define STRUCT_VFSMOUNT			1 //temporary
++#define STRUCT_VM_AREA_STRUCT		20
++#define STRUCT_AUDIT_KRULE		1 //temporary
 +//4.14.151
-+#define STRUCT_AUDIT_CONTEXT        1 //temporary
-+#define STRUCT_XFRM_STATE           1 //temporary
-+#define STRUCT_XFRM_USER_SEC_CTX    1 //temporary
-+#define STRUCT_XFRM_SEC_CTX         1 //temporary
-+#define STRUCT_SOCK                 1 //temporary
-+#define STRUCT_XFRM_POLICY          1 //temporary
-+#define STRUCT_MSGHDR               1 //temporary
-+#define STRUCT_SOCKADDR             1 //temporary
-+#define STRUCT_SOCKET               1 //temporary
-+#define STRUCT_KEY                  1 //temporary
-+#define STRUCT_SK_BUFF              1 //temporary
-+#define STRUCT_REQUEST_SOCK         1 //temporary
-+#define STRUCT_SEMBUF               1 //temporary
-+#define STRUCT_BPF_PROG_AUX         1 //temporary
-+#define STRUCT_BPF_PROG             1 //temporary
-+#define STRUCT_BPF_MAP              1 //temporary
-+#define STRUCT_SCTP_ENDPOINT        1 //temporary
-+#define STRUCT_FLOWI                1 //temporary
-+#define UMODE_T                     1 //temporary
-+#define UNSIGNED_INT                1
-+#define UNSIGNED_LONG               1 //temporary
-+#define VOID                        1 //temporary
-+#define UNSIGNED                    1 //temporary
-+#define U8                          1 //temporary
-+#define U16                         1 //temporary
-+#define U32                         1 //temporary
-+#define U64                         1 //temporary
++#define STRUCT_AUDIT_CONTEXT		1 //temporary
++#define STRUCT_XFRM_STATE		1 //temporary
++#define STRUCT_XFRM_USER_SEC_CTX	1 //temporary
++#define STRUCT_XFRM_SEC_CTX		1 //temporary
++#define STRUCT_SOCK			1 //temporary
++#define STRUCT_XFRM_POLICY		1 //temporary
++#define STRUCT_MSGHDR			1 //temporary
++#define STRUCT_SOCKADDR			1 //temporary
++#define STRUCT_SOCKET			1 //temporary
++#define STRUCT_KEY			1 //temporary
++#define STRUCT_SK_BUFF			1 //temporary
++#define STRUCT_REQUEST_SOCK		1 //temporary
++#define STRUCT_SEMBUF			1 //temporary
++#define STRUCT_BPF_PROG_AUX		1 //temporary
++#define STRUCT_BPF_PROG			1 //temporary
++#define STRUCT_BPF_MAP			1 //temporary
++#define STRUCT_SCTP_ENDPOINT		1 //temporary
++#define STRUCT_FLOWI			1 //temporary
++#define UMODE_T				1 //temporary
++#define UNSIGNED_INT			1
++#define UNSIGNED_LONG			1 //temporary
++#define VOID				1 //temporary
++#define UNSIGNED			1 //temporary
++#define U8				1 //temporary
++#define U16				1 //temporary
++#define U32				1 //temporary
++#define U64				1 //temporary
 +//4.14.151
-+#define STRUCT_SECURITY_MNT_OPTS    1 //temporary
-+#define STRUCT_SEM_ARRAY            1 //temporary
-+#define STRUCT_MSG_QUEUE            1 //temporary
-+#define STRUCT_SHMID_KERNEL         1 //temporary
-+//5.4
-+#define STRUCT_KERNEL_SIGINFO       1 //temporary
++#define STRUCT_SECURITY_MNT_OPTS	1 //temporary
++#define STRUCT_SEM_ARRAY		1 //temporary
++#define STRUCT_MSG_QUEUE		1 //temporary
++#define STRUCT_SHMID_KERNEL		1 //temporary
++//5.8
++#define STRUCT_KERNEL_SIGINFO		1  //temporary
++#define BPRM_SET_CREDS			1  //temporary
++#define CONST_KERNEL_CAP_T		1  //temporary
++#define ENUM_KEY_NEED_PERM		1  //temporary
 --- a/security/exein/Makefile
 +++ b/security/exein/Makefile
 @@ -0,0 +1,53 @@
@@ -4000,7 +4007,7 @@
 +	cmd_csv2ini = chmod +x $(srctree)/scripts/exein/csv2ini.sh && $(srctree)/scripts/exein/csv2ini.sh $(obj)/mkHookh_data/hooks.csv >$(obj)/mkHookh_data/hookspart.ini
 +
 +quiet_cmd_HeaderParser = PARSE	$(obj)/mkHookh_data/hooks.csv
-+	cmd_HeaderParser = $(obj)/../../scripts/exein/HeaderParser/HeaderParser < $(srctree)/include/linux/lsm_hooks.h >$(obj)/mkHookh_data/hooks.csv
++	cmd_HeaderParser = $(obj)/../../scripts/exein/HeaderParser/HeaderParser.sh $(srctree)/include/linux/lsm_hook_defs.h >$(obj)/mkHookh_data/hooks.csv
 +
 +
 +
@@ -4024,7 +4031,7 @@
 +$(obj)/mkHookh_data/hooks.csv: $(obj)/exein_nn_defs.h
 +	$(call if_changed,HeaderParser)
 +
-+$(obj)/exein_nn_defs.h: $(obj)/exein_nn_defs.h
++$(obj)/exein_nn_defs.h: FORCE
 +
 +FORCE: ;
 --- a/security/exein/exein_trust.h
@@ -6294,14 +6301,13 @@
 +void do_fork_push_pid(pid_t pid, void *addr);
 --- a/include/linux/sched.h
 +++ b/include/linux/sched.h
-@@ -665,6 +665,10 @@
+@@ -670,6 +670,9 @@
  	int				recent_used_cpu;
  	int				wake_cpu;
  #endif
 +#ifdef CONFIG_SECURITY_EXEIN
 +	uint16_t                        process_tag;
 +#endif
-+
  	int				on_rq;
  
  	int				prio;

@@ -39,7 +39,7 @@
 +					tmp=kmalloc(shdr[i].sh_size, GFP_KERNEL);
 +					tmppos=(loff_t) shdr[i].sh_offset;
 +					kernel_read(bprm->file, tmppos, (char *) tmp, shdr[i].sh_size);
-+					current->process_tag=*((uint16_t *) tmp);
++					current->process_tag=*((uint16_t *) tmp);printk(KERN_INFO "ExeinLKM - tag %d exists.\n", *((uint16_t *) tmp));
 +					kfree(tmp);
 +					}
 +				}
@@ -64,14 +64,12 @@
  
  static void __unhash_process(struct task_struct *p, bool group_dead)
  {
-@@ -898,6 +901,12 @@
+@@ -898,6 +901,10 @@
  	exit_rcu();
  	TASKS_RCU(__srcu_read_unlock(&tasks_rcu_exit_srcu, tasks_rcu_i));
  
 +#ifdef CONFIG_SECURITY_EXEIN
-+	if (tsk->process_tag) {
-+		exein_delete_pids();
-+                }
++	if (tsk->process_tag) exein_delete_pids();
 +#endif
 +
  	do_task_dead();
@@ -624,7 +622,7 @@
 +#undef EXEIN_INODE_GETSECURITY_SWITCH
 +#undef EXEIN_TASK_FREE_SWITCH
 +#undef EXEIN_SOCKET_SOCK_RCV_SKB_SWITCH
-+
++//#undef EXEIN_TASK_PRCTL_SWITCH
 +//#ifdef CONFIG_DUP_TS_FIND_IN_LSM
 +//extern int do_dup_td_find(int hook);
 +//#endif
@@ -1574,8 +1572,8 @@
 +    exein_map_inode_to_features(inode, &feature_index, NNInput);
 +    exein_map_inode_to_features(dir, &feature_index, NNInput);
 +    exein_map_qstr_to_features(qstr, &feature_index, NNInput);
-+    
-+    
++    exein_map_string_to_features(*name, DUMMY_STRING_MAX_LENGTH, &feature_index, NNInput);
++    NNInput[feature_index++] = (exein_feature_t) *len;
 +    feature_index=arg1_pos+EXEIN_INODE_INIT_SECURITY_SIZE;
 +
 +    exein_prepare_send_data(arg1_pos, feature_index, NNInput);
@@ -3851,91 +3849,6 @@
 +// 	.name = "exein",
 +// 	.init = exein_init,
 +// };
---- a/security/exein/eval_p_sym.h
-+++ b/security/exein/eval_p_sym.h
-@@ -0,0 +1,82 @@
-+#if EVALUATE_ ==0
-+#pragma message (SYMNAME "= 0")
-+#elif EVALUATE_ ==1
-+#pragma message (SYMNAME "= 1")
-+#elif EVALUATE_ ==2
-+#pragma message (SYMNAME "= 2")
-+#elif EVALUATE_ ==3
-+#pragma message (SYMNAME "= 3")
-+#elif EVALUATE_ ==4
-+#pragma message (SYMNAME "= 4")
-+#elif EVALUATE_ ==5
-+#pragma message (SYMNAME "= 5")
-+#elif EVALUATE_ ==6
-+#pragma message (SYMNAME "= 6")
-+#elif EVALUATE_ ==7
-+#pragma message (SYMNAME "= 7")
-+#elif EVALUATE_ ==8
-+#pragma message (SYMNAME "= 8")
-+#elif EVALUATE_ ==9
-+#pragma message (SYMNAME "= 9")
-+#elif EVALUATE_ ==10
-+#pragma message (SYMNAME "= 10")
-+#elif EVALUATE_ ==11
-+#pragma message (SYMNAME "= 11")
-+#elif EVALUATE_ ==12
-+#pragma message (SYMNAME "= 12")
-+#elif EVALUATE_ ==13
-+#pragma message (SYMNAME "= 13")
-+#elif EVALUATE_ ==14
-+#pragma message (SYMNAME "= 14")
-+#elif EVALUATE_ ==15
-+#pragma message (SYMNAME "= 15")
-+#elif EVALUATE_ ==16
-+#pragma message (SYMNAME "= 16")
-+#elif EVALUATE_ ==17
-+#pragma message (SYMNAME "= 17")
-+#elif EVALUATE_ ==18
-+#pragma message (SYMNAME "= 18")
-+#elif EVALUATE_ ==19
-+#pragma message (SYMNAME "= 19")
-+#elif EVALUATE_ ==10
-+#pragma message (SYMNAME "= 10")
-+#elif EVALUATE_ ==21
-+#pragma message (SYMNAME "= 21")
-+#elif EVALUATE_ ==22
-+#pragma message (SYMNAME "= 22")
-+#elif EVALUATE_ ==23
-+#pragma message (SYMNAME "= 23")
-+#elif EVALUATE_ ==24
-+#pragma message (SYMNAME "= 24")
-+#elif EVALUATE_ ==25
-+#pragma message (SYMNAME "= 25")
-+#elif EVALUATE_ ==26
-+#pragma message (SYMNAME "= 26")
-+#elif EVALUATE_ ==27
-+#pragma message (SYMNAME "= 27")
-+#elif EVALUATE_ ==28
-+#pragma message (SYMNAME "= 28")
-+#elif EVALUATE_ ==29
-+#pragma message (SYMNAME "= 29")
-+
-+#elif EVALUATE_ ==30
-+#pragma message (SYMNAME "= 30")
-+#elif EVALUATE_ ==31
-+#pragma message (SYMNAME "= 31")
-+#elif EVALUATE_ ==32
-+#pragma message (SYMNAME "= 32")
-+#elif EVALUATE_ ==33
-+#pragma message (SYMNAME "= 33")
-+#elif EVALUATE_ ==34
-+#pragma message (SYMNAME "= 34")
-+#elif EVALUATE_ ==35
-+#pragma message (SYMNAME "= 35")
-+#elif EVALUATE_ ==36
-+#pragma message (SYMNAME "= 36")
-+#elif EVALUATE_ ==37
-+#pragma message (SYMNAME "= 37")
-+#elif EVALUATE_ ==38
-+#pragma message (SYMNAME "= 38")
-+#elif EVALUATE_ ==39
-+#pragma message (SYMNAME "= 39")
-+#endif
 --- a/security/exein/exein_nn_defs_parts.h
 +++ b/security/exein/exein_nn_defs_parts.h
 @@ -0,0 +1,101 @@
@@ -4042,9 +3955,9 @@
 +#define STRUCT_SHMID_KERNEL         1 //temporary
 --- a/security/exein/Makefile
 +++ b/security/exein/Makefile
-@@ -0,0 +1,46 @@
+@@ -0,0 +1,53 @@
 +obj-$(CONFIG_SECURITY_EXEIN) := exein.o
-+exein-y := exein_lsm.o exein_nn_main.o exein_struct_mappings.o exein_trust.o
++exein-y := exein_lsm.o exein_nn_main.o exein_struct_mappings.o exein_trust.o exein_nn_data.o
 +ccflags-y := -Wno-declaration-after-statement -Wno-unused-function
 +
 +$(addprefix $(obj)/,$(exein-y)): $(obj)/exein_nn_defs.h
@@ -4053,7 +3966,14 @@
 +$(addprefix $(obj)/,$(exein-y)): $(obj)/exein_nn_defs_comp.h
 +
 +quiet_cmd_mkHooksh = GENH	$(srctree)/exein_nn_defs.h
-+	cmd_mkHooksh = $(obj)/../../scripts/exein/mkHookh/mkHookh $(obj)/mkHookh_data/hooks.ini $(obj)/mkHookh_data/config.ini Y >$(srctree)/security/exein/exein_nn_defs.h && chmod +x $(srctree)/scripts/exein/make_define_aliases.sh && $(srctree)/scripts/exein/make_define_aliases.sh >>$(srctree)/security/exein/exein_nn_defs.h
++	cmd_mkHooksh = $(obj)/../../scripts/exein/mkHookh/mkHookh \
++			$(obj)/mkHookh_data/hooks.ini \
++			$(obj)/mkHookh_data/config.ini A >$(srctree)/security/exein/exein_nn_data.c && \
++			$(obj)/../../scripts/exein/mkHookh/mkHookh \
++			$(obj)/mkHookh_data/hooks.ini \
++			$(obj)/mkHookh_data/config.ini Y >$(srctree)/security/exein/exein_nn_defs.h && \
++			chmod +x $(srctree)/scripts/exein/make_define_aliases.sh && \
++			$(srctree)/scripts/exein/make_define_aliases.sh >>$(srctree)/security/exein/exein_nn_defs.h
 +
 +quiet_cmd_mkHookhcomp = GENH	$(srctree)/exein_nn_defs_comp.h
 +	cmd_mkHookhcomp = $(obj)/../../scripts/exein/mkHookhcomp/mkHookhcomp $(obj)/mkHookh_data/hookspart.ini $(obj)/mkHookh_data/config.ini >$(srctree)/security/exein/exein_nn_defs_comp.h
@@ -4074,7 +3994,7 @@
 +$(obj)/exein_nn_defs_comp.h: $(obj)/mkHookh_data/hookspart.ini
 +	$(call if_changed,mkHookhcomp)
 +
-+$(obj)/exein_nn_defs.h: FORCE
++$(obj)/exein_nn_defs.h $(obj)/exein_nn_data.c: FORCE
 +ifeq ($(wildcard $(obj)/mkHookh_data/.),)
 +	cp -r $(srctree)/security/exein/mkHookh_data/ $(obj)
 +endif
@@ -4307,15 +4227,17 @@
 +void exein_map_qstr_to_features(            const struct qstr* input,               size_t* index_p,   exein_feature_t* features_arr);
 --- a/security/exein/exein_nn_main.c
 +++ b/security/exein/exein_nn_main.c
-@@ -0,0 +1,9 @@
+@@ -0,0 +1,11 @@
 +#include "exein_nn_main.h"
-+#include <linux/string.h> 
++#include <linux/string.h>
 +#include "exein_lsm.h"
++#include "exein_nn_defs.h"
 +
 +int playnn(exein_feature_t *NNInput)
 +{
 +	exein_delete_expired_regs();
-+	return 0;
++//	printk(KERN_INFO "#[%d,%d,%d,%d]R%d\n", *(NNInput),*(NNInput+1),*(NNInput+2), *(NNInput+3), hook_default_values[*(NNInput+2)]);
++	return hook_default_values[*NNInput];
 +}
 --- a/security/exein/exein_trust.c
 +++ b/security/exein/exein_trust.c
@@ -4353,10 +4275,19 @@
 +
 --- a/security/exein/mkHookh_data/config.ini
 +++ b/security/exein/mkHookh_data/config.ini
-@@ -0,0 +1,3 @@
+@@ -0,0 +1,12 @@
 +[files]
 +header=./security/exein/mkHookh_data/banner.txt
 +footer=./security/exein/mkHookh_data/banner.txt
++
++[hooksInit]
++FS_CONTEXT_PARSE_PARAM= -ENOPARAM
++INODE_GETSECURITY= -EOPNOTSUPP
++TASK_PRCTL= -ENOSYS
++GETPROCATTR= -EINVAL
++SETPROCATTR= -EINVAL
++SECID_TO_SECCTX= -EOPNOTSUPP
++XFRM_STATE_POL_FLOW_MATCH=  1
 --- a/security/exein/mkHookh_data/hooks.ini
 +++ b/security/exein/mkHookh_data/hooks.ini
 @@ -0,0 +1,221 @@
@@ -5496,12 +5427,22 @@
 +always          := $(hostprogs-y)
 --- a/scripts/exein/mkHookh/mkHookh.c
 +++ b/scripts/exein/mkHookh/mkHookh.c
-@@ -0,0 +1,103 @@
+@@ -0,0 +1,119 @@
 +#include <stdio.h>
 +#include <stdlib.h>
++#include <time.h>
 +#include "../config.h"
 +#define FILE_BUFFER_SIZE 1048510
 +#define MAXCHAR 1024
++
++char *hookval(char *key, sections_t *data){
++	keys_t *tmp_key;
++	for (int i=0;tmp_key=get_key("hooksInit",&i,data, NAME_NUMBER); i++){
++		if (strcmp(key,KeyName(tmp_key))==0) return KeyValue(tmp_key);
++		}
++	return "0";
++}
++
 +
 +int main(int argc, char **argv)
 +{
@@ -5510,22 +5451,22 @@
 +	keys_t *tmp_key;
 +	sections_t section_head = {0};
 +	sections_t config_head = {0};
-+	int pos=0, cur_array_pos=0;
++	int pos=0, hva_pos=0, cur_array_pos=0;
 +	FILE *fp;
 +	char str[MAXCHAR];
 +	char *prev="0";
 +	char *prevVal;
 +
-+
-+        if (argc!=4) {
-+                printf("call:\n\tmkHookh hooks.ini config.ini [Y/N]\n");
-+                exit(1);
-+                }
++	if (argc!=4) {
++		printf("call:\n\tmkHookh hooks.ini config.ini [Y/N/A]\n");
++		exit(1);
++		}
 +
 +
 +	srand(time(NULL));
 +	char *H_file=(char *)malloc(FILE_BUFFER_SIZE);
-+        memset(H_file,0, FILE_BUFFER_SIZE);
++	char *hook_default_value_array=(char *)malloc(FILE_BUFFER_SIZE);
++	memset(H_file,0, FILE_BUFFER_SIZE);
 +	read_ini_file(argv[1], &section_head);
 +	read_ini_file(argv[2], &config_head);
 +
@@ -5538,16 +5479,20 @@
 + |_| |_|\___|\__,_|\__,_|\___|_|  |___/
 +
 +*/
-+	pos+=sprintf((H_file+pos),"#include \"exein_nn_defs_comp.h\"\n", prev, prevVal );
-+	if (strncmp(argv[3],"Y",1)==0) {
++	pos+=sprintf((H_file+pos),"#ifndef _EXEIN_NN_DEFS_H\n" );
++	pos+=sprintf((H_file+pos),"#define _EXEIN_NN_DEFS_H\n" );
++	pos+=sprintf((H_file+pos),"#include \"exein_nn_defs_comp.h\"\n" );
++	if ((strncmp(argv[3],"Y",1)==0)||(strncmp(argv[3],"A",1)==0)) {
 +		int counter=0;
 +		for (int i=0;tmp_sec=get_section(&i,&section_head, NUMBER); i++){
-+			pos+=sprintf((H_file+pos),"/**********/\n", tmp_sec);
++			pos+=sprintf((H_file+pos),"/**********/\n");
 +			for (int j=0; tmp_key=get_key(&i,&j,&section_head, NUMBER_NUMBER); j++){
 +				pos+=sprintf((H_file+pos),"#define EXEIN_%s_ID %d\n", KeyName(tmp_key), counter);
++				hva_pos+=sprintf( (hook_default_value_array+hva_pos),"%s,%s", hookval(KeyName(tmp_key), &config_head), (counter&7)==7?"\n\t":" ");
 +				counter++;
 +				}
 +			}
++		*(hook_default_value_array+hva_pos)=0;
 +		}
 +	pos+=sprintf((H_file+pos),"\n\n/********************************************************************************************************/\n");
 +	pos+=sprintf((H_file+pos),"#define EXEIN_0_ARG1_POS  0\n");
@@ -5555,24 +5500,20 @@
 +	pos+=sprintf((H_file+pos),"#define HOOK_CURRENT_PROCESS  1\n");
 +	pos+=sprintf((H_file+pos),"#define HOOK_CURRENT_PROCESS_TAG  1\n");
 +	for (int i=0;tmp_sec=get_section(&i,&section_head, NUMBER); i++){
-+		pos+=sprintf((H_file+pos),"/**********/\n", tmp_sec);
++		pos+=sprintf((H_file+pos),"/**********/\n");
 +		for (int j=0; tmp_key=get_key(&i,&j,&section_head, NUMBER_NUMBER); j++){
-+
 +			pos+=sprintf((H_file+pos),"#define EXEIN_%s_ARG1_POS	EXEIN_%s_ARG1_POS + %s\n", KeyName(tmp_key), prev, prev);
 +			pos+=sprintf((H_file+pos),"#define EXEIN_%s_SIZE 	%s\n", KeyName(tmp_key), KeyValue(tmp_key));
-+			//cur_array_pos+=atoi(KeyValue(tmp_key));
-+                        prev=KeyName(tmp_key);
++			prev=KeyName(tmp_key);
 +			prevVal=KeyValue(tmp_key);
 +			}
 +		}
-+	
 +	pos+=sprintf((H_file+pos),"\n\n/********************************************************************************************************/\n");
 +	pos+=sprintf((H_file+pos),"\n\n#define EXEIN_NN_INPUT_SIZE EXEIN_%s_ARG1_POS + %s\n", prev, prevVal );
 +	pos+=sprintf((H_file+pos),"\n\n/********************************************************************************************************/\n");
 +	pos+=sprintf((H_file+pos),"\n\n#define SEEDRND %d\n", rand() );
-+
-+
-+
++	pos+=sprintf((H_file+pos),"\n\n\textern const int hook_default_values[];\n");
++	pos+=sprintf((H_file+pos),"\n\n#endif\n");
 +/*
 +              _               _
 +             | |             | |
@@ -5590,14 +5531,20 @@
 +		}
 +	while (fgets(str, MAXCHAR, fp) != NULL) printf("%s", str);
 +	fclose(fp);
-+	puts(H_file);
-+        fp = fopen(KeyValue(get_key("files","footer",&config_head, NAME_NAME)), "r");
-+        if (fp == NULL){
-+                printf("Could not open header file\n");
-+                return 1;
-+                }
-+        while (fgets(str, MAXCHAR, fp) != NULL) printf("%s", str);
-+        fclose(fp);
++
++	if (strncmp(argv[3],"A",1)!=0)puts(H_file);
++		else {
++			printf("#include <uapi/asm-generic/errno.h>\n\n" );
++			printf("/*hooks default values begin*/\n\tint hook_default_values[]={\n\t%s};\n/*hooks default values end*/\n",hook_default_value_array);
++			}
++
++	fp = fopen(KeyValue(get_key("files","footer",&config_head, NAME_NAME)), "r");
++	if (fp == NULL){
++		printf("Could not open header file\n");
++		return 1;
++		}
++	while (fgets(str, MAXCHAR, fp) != NULL) printf("%s", str);
++	fclose(fp);
 +	return 0;
 +}
 --- a/scripts/exein/mkHookhcomp/mkHookhcomp.c
@@ -6304,3 +6251,180 @@
  	int prio, static_prio, normal_prio;
  	unsigned int rt_priority;
  	const struct sched_class *sched_class;
+--- a/docs/GeneralDiagram.svg
++++ b/docs/GeneralDiagram.svg
+@@ -0,0 +1,3 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
++<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" width="654px" height="444px" viewBox="-0.5 -0.5 654 444" content="&lt;mxfile host=&quot;app.diagrams.net&quot; modified=&quot;2020-05-19T10:30:12.158Z&quot; agent=&quot;5.0 (X11)&quot; etag=&quot;wJsR3v6sjBHt92BrfcgQ&quot; version=&quot;13.1.1&quot; type=&quot;device&quot;&gt;&lt;diagram id=&quot;2CBHIzs9DMrx8Qk8myeK&quot; name=&quot;Page-1&quot;&gt;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&lt;/diagram&gt;&lt;/mxfile&gt;"><defs/><g><rect x="1.38" y="172" width="650" height="270" rx="40.5" ry="40.5" fill="#ffffff" stroke="#000000" stroke-width="4" pointer-events="all"/><rect x="130.38" y="352" width="120" height="60" rx="9" ry="9" fill="#d5e8d4" stroke="#82b366" stroke-width="4" pointer-events="all"/><g transform="translate(-0.5 -0.5)"><switch><foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility"><div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 118px; height: 1px; padding-top: 382px; margin-left: 131px;"><div style="box-sizing: border-box; font-size: 0; text-align: center; "><div style="display: inline-block; font-size: 12px; font-family: Helvetica; color: #000000; line-height: 1.2; pointer-events: all; font-weight: bold; white-space: normal; word-wrap: normal; ">Exein LSM</div></div></div></foreignObject><text x="190" y="386" fill="#000000" font-family="Helvetica" font-size="12px" text-anchor="middle" font-weight="bold">Exein LSM</text></switch></g><path d="M 221.37 192 L 221.37 68.37" fill="none" stroke="#b85450" stroke-miterlimit="10" pointer-events="stroke"/><path d="M 221.37 63.12 L 224.87 70.12 L 221.37 68.37 L 217.87 70.12 Z" fill="#b85450" stroke="#b85450" stroke-miterlimit="10" pointer-events="all"/><g transform="translate(-0.5 -0.5)"><switch><foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility"><div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 1px; height: 1px; padding-top: 112px; margin-left: 322px;"><div style="box-sizing: border-box; font-size: 0; text-align: center; "><div style="display: inline-block; font-size: 11px; font-family: Helvetica; color: #000000; line-height: 1.2; pointer-events: all; font-weight: bold; white-space: nowrap; "><div><br /></div><div><br /></div></div></div></div></foreignObject><text x="322" y="115" fill="#000000" font-family="Helvetica" font-size="11px" text-anchor="middle" font-weight="bold">&#xa;</text></switch></g><path d="M 131.28 222 L 51 222 L 51 396.69 L 121.61 396.7" fill="none" stroke="#b85450" stroke-miterlimit="10" pointer-events="stroke"/><path d="M 126.86 396.7 L 119.86 400.2 L 121.61 396.7 L 119.86 393.2 Z" fill="#b85450" stroke="#b85450" stroke-miterlimit="10" pointer-events="all"/><rect x="135.38" y="192" width="120" height="60" rx="9" ry="9" fill="#f8cecc" stroke="#b85450" stroke-width="4" pointer-events="all"/><g transform="translate(-0.5 -0.5)"><switch><foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility"><div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 118px; height: 1px; padding-top: 222px; margin-left: 136px;"><div style="box-sizing: border-box; font-size: 0; text-align: center; "><div style="display: inline-block; font-size: 12px; font-family: Helvetica; color: #000000; line-height: 1.2; pointer-events: all; font-weight: bold; white-space: normal; word-wrap: normal; ">Exein LKM</div></div></div></foreignObject><text x="195" y="226" fill="#000000" font-family="Helvetica" font-size="12px" text-anchor="middle" font-weight="bold">Exein LKM</text></switch></g><path d="M 411.38 368 L 371.41 368 L 257.75 368" fill="none" stroke="#666666" stroke-miterlimit="10" pointer-events="stroke"/><path d="M 252.5 368 L 259.5 364.5 L 257.75 368 L 259.5 371.5 Z" fill="#666666" stroke="#666666" stroke-miterlimit="10" pointer-events="all"/><g transform="translate(-0.5 -0.5)"><switch><foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility"><div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 1px; height: 1px; padding-top: 368px; margin-left: 331px;"><div style="box-sizing: border-box; font-size: 0; text-align: center; "><div style="display: inline-block; font-size: 11px; font-family: Helvetica; color: #000000; line-height: 1.2; pointer-events: all; font-weight: bold; white-space: nowrap; ">Kernel Hooks</div></div></div></foreignObject><text x="331" y="371" fill="#000000" font-family="Helvetica" font-size="11px" text-anchor="middle" font-weight="bold">Kernel Hooks</text></switch></g><rect x="410.38" y="192" width="221" height="230" rx="33.15" ry="33.15" fill="#f5f5f5" stroke="#666666" stroke-width="4" pointer-events="all"/><g transform="translate(-0.5 -0.5)"><switch><foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility"><div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 219px; height: 1px; padding-top: 307px; margin-left: 411px;"><div style="box-sizing: border-box; font-size: 0; text-align: center; "><div style="display: inline-block; font-size: 12px; font-family: Helvetica; color: #333333; line-height: 1.2; pointer-events: all; font-weight: bold; white-space: normal; word-wrap: normal; ">Linux Kernel</div></div></div></foreignObject><text x="521" y="311" fill="#333333" font-family="Helvetica" font-size="12px" text-anchor="middle" font-weight="bold">Linux Kernel</text></switch></g><path d="M 520.88 62 L 520.88 185.63" fill="none" stroke="#d6b656" stroke-miterlimit="10" pointer-events="stroke"/><path d="M 520.88 190.88 L 517.38 183.88 L 520.88 185.63 L 524.38 183.88 Z" fill="#d6b656" stroke="#d6b656" stroke-miterlimit="10" pointer-events="all"/><g transform="translate(-0.5 -0.5)"><switch><foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility"><div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 1px; height: 1px; padding-top: 127px; margin-left: 521px;"><div style="box-sizing: border-box; font-size: 0; text-align: center; "><div style="display: inline-block; font-size: 11px; font-family: Helvetica; color: #000000; line-height: 1.2; pointer-events: all; font-weight: bold; white-space: nowrap; ">Syscall</div></div></div></foreignObject><text x="521" y="130" fill="#000000" font-family="Helvetica" font-size="11px" text-anchor="middle" font-weight="bold">Syscall</text></switch></g><rect x="460.88" y="2" width="120" height="60" rx="9" ry="9" fill="#fff2cc" stroke="#d6b656" stroke-width="4" pointer-events="all"/><g transform="translate(-0.5 -0.5)"><switch><foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility"><div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 118px; height: 1px; padding-top: 32px; margin-left: 462px;"><div style="box-sizing: border-box; font-size: 0; text-align: center; "><div style="display: inline-block; font-size: 12px; font-family: Helvetica; color: #000000; line-height: 1.2; pointer-events: all; font-weight: bold; white-space: normal; word-wrap: normal; ">Process</div></div></div></foreignObject><text x="521" y="36" fill="#000000" font-family="Helvetica" font-size="12px" text-anchor="middle" font-weight="bold">Process</text></switch></g><path d="M 404.92 396.81 L 251.28 396.83 L 251.28 408.24" fill="none" stroke="#82b366" stroke-miterlimit="10" pointer-events="stroke"/><path d="M 410.17 396.81 L 403.17 400.31 L 404.92 396.81 L 403.17 393.31 Z" fill="#82b366" stroke="#82b366" stroke-miterlimit="10" pointer-events="all"/><g transform="translate(-0.5 -0.5)"><switch><foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility"><div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 1px; height: 1px; padding-top: 397px; margin-left: 326px;"><div style="box-sizing: border-box; font-size: 0; text-align: center; "><div style="display: inline-block; font-size: 11px; font-family: Helvetica; color: #000000; line-height: 1.2; pointer-events: all; font-weight: bold; white-space: nowrap; ">Kill PID</div></div></div></foreignObject><text x="326" y="400" fill="#000000" font-family="Helvetica" font-size="11px" text-anchor="middle" font-weight="bold">Kill PID</text></switch></g><path d="M 131.38 32 L 51.41 32 L 51.41 206.97 L 129.01 207" fill="none" stroke="#6c8ebf" stroke-miterlimit="10" pointer-events="stroke"/><path d="M 134.26 207 L 127.26 210.5 L 129.01 207 L 127.26 203.5 Z" fill="#6c8ebf" stroke="#6c8ebf" stroke-miterlimit="10" pointer-events="all"/><rect x="131.38" y="2" width="120" height="60" rx="9" ry="9" fill="#dae8fc" stroke="#6c8ebf" stroke-width="4" pointer-events="all"/><g transform="translate(-0.5 -0.5)"><switch><foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility"><div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 118px; height: 1px; padding-top: 32px; margin-left: 132px;"><div style="box-sizing: border-box; font-size: 0; text-align: center; "><div style="display: inline-block; font-size: 12px; font-family: Helvetica; color: #000000; line-height: 1.2; pointer-events: all; font-weight: bold; white-space: normal; word-wrap: normal; ">Exein MLE</div></div></div></foreignObject><text x="191" y="36" fill="#000000" font-family="Helvetica" font-size="12px" text-anchor="middle" font-weight="bold">Exein MLE</text></switch></g><rect x="293.67" y="182" width="105" height="20" fill="none" stroke="none" pointer-events="all"/><g transform="translate(-0.5 -0.5)"><switch><foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility"><div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 103px; height: 1px; padding-top: 192px; margin-left: 295px;"><div style="box-sizing: border-box; font-size: 0; text-align: center; "><div style="display: inline-block; font-size: 12px; font-family: Helvetica; color: #000000; line-height: 1.2; pointer-events: all; font-weight: bold; white-space: normal; word-wrap: normal; ">KERNEL SPACE</div></div></div></foreignObject><text x="346" y="196" fill="#000000" font-family="Helvetica" font-size="12px" text-anchor="middle" font-weight="bold">KERNEL SPACE</text></switch></g><rect x="293.67" y="142" width="105" height="20" fill="none" stroke="none" pointer-events="all"/><g transform="translate(-0.5 -0.5)"><switch><foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility"><div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 103px; height: 1px; padding-top: 152px; margin-left: 295px;"><div style="box-sizing: border-box; font-size: 0; text-align: center; "><div style="display: inline-block; font-size: 12px; font-family: Helvetica; color: #000000; line-height: 1.2; pointer-events: all; font-weight: bold; white-space: normal; word-wrap: normal; ">USER SPACE</div></div></div></foreignObject><text x="346" y="156" fill="#000000" font-family="Helvetica" font-size="12px" text-anchor="middle" font-weight="bold">USER SPACE</text></switch></g><rect x="562" y="22" width="30" height="20" rx="3" ry="3" fill="#ffffff" stroke="#000000" pointer-events="all"/><g transform="translate(-0.5 -0.5)"><switch><foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility"><div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 28px; height: 1px; padding-top: 32px; margin-left: 563px;"><div style="box-sizing: border-box; font-size: 0; text-align: center; "><div style="display: inline-block; font-size: 12px; font-family: Helvetica; color: #000000; line-height: 1.2; pointer-events: all; white-space: normal; word-wrap: normal; ">TAG</div></div></div></foreignObject><text x="577" y="36" fill="#000000" font-family="Helvetica" font-size="12px" text-anchor="middle">TAG</text></switch></g><rect x="182" y="102" width="79.69" height="20" fill="none" stroke="none" transform="rotate(-90,221.85,112)" pointer-events="all"/><g transform="translate(-0.5 -0.5)rotate(-90 221.84500000000003 111.99999999999989)"><switch><foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility"><div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 78px; height: 1px; padding-top: 112px; margin-left: 183px;"><div style="box-sizing: border-box; font-size: 0; text-align: center; "><div style="display: inline-block; font-size: 12px; font-family: Helvetica; color: #000000; line-height: 1.2; pointer-events: all; white-space: normal; word-wrap: normal; "><div><font style="font-size: 10px">Process <br /></font></div><div><font style="font-size: 10px">Features Feed</font></div></div></div></div></foreignObject><text x="222" y="116" fill="#000000" font-family="Helvetica" font-size="12px" text-anchor="middle">Process...</text></switch></g><path d="M 162 192 L 162 68.37" fill="none" stroke="#b85450" stroke-miterlimit="10" pointer-events="stroke"/><path d="M 162 63.12 L 165.5 70.12 L 162 68.37 L 158.5 70.12 Z" fill="#b85450" stroke="#b85450" stroke-miterlimit="10" pointer-events="all"/><g transform="translate(-0.5 -0.5)"><switch><foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility"><div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 1px; height: 1px; padding-top: 112px; margin-left: 263px;"><div style="box-sizing: border-box; font-size: 0; text-align: center; "><div style="display: inline-block; font-size: 11px; font-family: Helvetica; color: #000000; line-height: 1.2; pointer-events: all; font-weight: bold; white-space: nowrap; "><div><br /></div><div><br /></div></div></div></div></foreignObject><text x="263" y="115" fill="#000000" font-family="Helvetica" font-size="11px" text-anchor="middle" font-weight="bold">&#xa;</text></switch></g><path d="M 191.24 185.63 L 191.24 68.37" fill="none" stroke="#b85450" stroke-miterlimit="10" pointer-events="stroke"/><path d="M 191.24 190.88 L 187.74 183.88 L 191.24 185.63 L 194.74 183.88 Z" fill="#b85450" stroke="#b85450" stroke-miterlimit="10" pointer-events="all"/><path d="M 191.24 63.12 L 194.74 70.12 L 191.24 68.37 L 187.74 70.12 Z" fill="#b85450" stroke="#b85450" stroke-miterlimit="10" pointer-events="all"/><g transform="translate(-0.5 -0.5)"><switch><foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility"><div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 1px; height: 1px; padding-top: 112px; margin-left: 292px;"><div style="box-sizing: border-box; font-size: 0; text-align: center; "><div style="display: inline-block; font-size: 11px; font-family: Helvetica; color: #000000; line-height: 1.2; pointer-events: all; font-weight: bold; white-space: nowrap; "><div><br /></div><div><br /></div></div></div></div></foreignObject><text x="292" y="115" fill="#000000" font-family="Helvetica" font-size="11px" text-anchor="middle" font-weight="bold">&#xa;</text></switch></g><rect x="112" y="102" width="79.69" height="20" fill="none" stroke="none" transform="rotate(-90,151.85,112)" pointer-events="all"/><g transform="translate(-0.5 -0.5)rotate(-90 151.84500000000003 111.99999999999989)"><switch><foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility"><div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 78px; height: 1px; padding-top: 112px; margin-left: 113px;"><div style="box-sizing: border-box; font-size: 0; text-align: center; "><div style="display: inline-block; font-size: 12px; font-family: Helvetica; color: #000000; line-height: 1.2; pointer-events: all; white-space: normal; word-wrap: normal; "><font style="font-size: 10px">New PID</font></div></div></div></foreignObject><text x="152" y="116" fill="#000000" font-family="Helvetica" font-size="12px" text-anchor="middle">New PID</text></switch></g><rect x="142" y="102" width="79.69" height="20" fill="none" stroke="none" transform="rotate(-90,181.85,112)" pointer-events="all"/><g transform="translate(-0.5 -0.5)rotate(-90 181.84500000000003 111.99999999999989)"><switch><foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility"><div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 78px; height: 1px; padding-top: 112px; margin-left: 143px;"><div style="box-sizing: border-box; font-size: 0; text-align: center; "><div style="display: inline-block; font-size: 12px; font-family: Helvetica; color: #000000; line-height: 1.2; pointer-events: all; white-space: normal; word-wrap: normal; "><div><font style="font-size: 10px">Delete PID</font></div></div></div></div></foreignObject><text x="182" y="116" fill="#000000" font-family="Helvetica" font-size="12px" text-anchor="middle">Delete PID</text></switch></g><rect x="-38" y="92" width="150" height="20" fill="none" stroke="none" transform="rotate(-90,37,102)" pointer-events="all"/><g transform="translate(-0.5 -0.5)rotate(-90 37 101.99999999999989)"><switch><foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility"><div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 148px; height: 1px; padding-top: 102px; margin-left: -37px;"><div style="box-sizing: border-box; font-size: 0; text-align: center; "><div style="display: inline-block; font-size: 12px; font-family: Helvetica; color: #000000; line-height: 1.2; pointer-events: all; white-space: normal; word-wrap: normal; "><b>Anomaly Detected</b></div></div></div></foreignObject><text x="37" y="106" fill="#000000" font-family="Helvetica" font-size="12px" text-anchor="middle">Anomaly Detected</text></switch></g><rect x="-18" y="297" width="120.72" height="20" fill="none" stroke="none" transform="rotate(-90,42.36,307)" pointer-events="all"/><g transform="translate(-0.5 -0.5)rotate(-90 42.36000000000013 306.9999999999999)"><switch><foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility"><div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 119px; height: 1px; padding-top: 307px; margin-left: -17px;"><div style="box-sizing: border-box; font-size: 0; text-align: center; "><div style="display: inline-block; font-size: 12px; font-family: Helvetica; color: #000000; line-height: 1.2; pointer-events: all; white-space: normal; word-wrap: normal; ">Distrust Process</div></div></div></foreignObject><text x="42" y="311" fill="#000000" font-family="Helvetica" font-size="12px" text-anchor="middle">Distrust Process</text></switch></g><rect x="152" y="297" width="151.62" height="20" fill="none" stroke="none" pointer-events="all"/><g transform="translate(-0.5 -0.5)"><switch><foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility"><div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 150px; height: 1px; padding-top: 307px; margin-left: 153px;"><div style="box-sizing: border-box; font-size: 0; text-align: center; "><div style="display: inline-block; font-size: 12px; font-family: Helvetica; color: #000000; line-height: 1.2; pointer-events: all; white-space: normal; word-wrap: normal; "><div><font style="font-size: 10px">Tag, Hook ID &amp; <br /></font></div><div><font style="font-size: 10px">Features</font></div></div></div></div></foreignObject><text x="228" y="311" fill="#000000" font-family="Helvetica" font-size="12px" text-anchor="middle">Tag, Hook ID &amp;...</text></switch></g><path d="M 292 268 C 292 246.67 352 246.67 352 268 L 352 316 C 352 337.33 292 337.33 292 316 Z" fill="#ffffff" stroke="#000000" stroke-miterlimit="10" pointer-events="all"/><path d="M 292 268 C 292 284 352 284 352 268" fill="none" stroke="#000000" stroke-miterlimit="10" pointer-events="all"/><path d="M 190.38 352 L 190.09 318 Q 190 308 200 308 L 285.63 308" fill="none" stroke="#000000" stroke-miterlimit="10" pointer-events="stroke"/><path d="M 290.88 308 L 283.88 311.5 L 285.63 308 L 283.88 304.5 Z" fill="#000000" stroke="#000000" stroke-miterlimit="10" pointer-events="all"/><path d="M 285.63 276 L 205 276 Q 195 276 195.14 267.18 L 195.28 258.37" fill="none" stroke="#000000" stroke-miterlimit="10" pointer-events="stroke"/><path d="M 290.88 276 L 283.88 279.5 L 285.63 276 L 283.88 272.5 Z" fill="#000000" stroke="#000000" stroke-miterlimit="10" pointer-events="all"/><path d="M 195.36 253.12 L 198.75 260.17 L 195.28 258.37 L 191.75 260.06 Z" fill="#000000" stroke="#000000" stroke-miterlimit="10" pointer-events="all"/><rect x="212" y="265" width="61.93" height="20" fill="none" stroke="none" pointer-events="all"/><g transform="translate(-0.5 -0.5)"><switch><foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility"><div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 60px; height: 1px; padding-top: 275px; margin-left: 213px;"><div style="box-sizing: border-box; font-size: 0; text-align: center; "><div style="display: inline-block; font-size: 12px; font-family: Helvetica; color: #000000; line-height: 1.2; pointer-events: all; white-space: normal; word-wrap: normal; "><div>Requests</div><div>Feeds<br /></div></div></div></div></foreignObject><text x="243" y="279" fill="#000000" font-family="Helvetica" font-size="12px" text-anchor="middle">Requests...</text></switch></g><rect x="297" y="277" width="50" height="50" fill="none" stroke="none" pointer-events="all"/><g transform="translate(-0.5 -0.5)"><switch><foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility"><div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 1px; height: 1px; padding-top: 302px; margin-left: 322px;"><div style="box-sizing: border-box; font-size: 0; text-align: center; "><div style="display: inline-block; font-size: 12px; font-family: Helvetica; color: #000000; line-height: 1.2; pointer-events: all; white-space: nowrap; ">Hooks<br /><div>Data</div><div>Buffer<br /></div></div></div></div></foreignObject><text x="322" y="306" fill="#000000" font-family="Helvetica" font-size="12px" text-anchor="middle">Hooks...</text></switch></g></g><switch><g requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility"/><a transform="translate(0,-5)" xlink:href="https://desk.draw.io/support/solutions/articles/16000042487" target="_blank"><text text-anchor="middle" font-size="10px" x="50%" y="100%">Viewer does not support full SVG 1.1</text></a></switch></svg>
+\ No newline at end of file
+--- a/docs/GeneralDiagram.drawio
++++ b/docs/GeneralDiagram.drawio
+@@ -0,0 +1 @@
++<mxfile host="app.diagrams.net" modified="2020-05-19T10:29:39.167Z" agent="5.0 (X11)" etag="XiY3apEiKd-4f5y2xZ6T" version="13.1.1" type="device"><diagram id="2CBHIzs9DMrx8Qk8myeK" name="Page-1">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</diagram></mxfile>
+\ No newline at end of file
+--- a/docs/GeneralDiagram.png
++++ b/docs/GeneralDiagram.png
+@@ -0,0 +1,155 @@
++‰PNG
++
++   IHDR    ¼   PT$Û  „tEXtmxfile %3Cmxfile%20host%3D%22app.diagrams.net%22%20modified%3D%222020-05-19T10%3A30%3A29.084Z%22%20agent%3D%225.0%20(X11)%22%20etag%3D%22eMYYK1FrMU7KxfFST_A2%22%20version%3D%2213.1.1%22%20type%3D%22device%22%3E%3Cdiagram%20id%3D%222CBHIzs9DMrx8Qk8myeK%22%20name%3D%22Page-1%22%3E7Vxtd6I6EP41fpQDhCB81Gq7e9a9t3fd1097EKJyF42F2Gp%2F%2FU0kIJCgoPhyt9ueY2EIQ5h5ZvJMEtsCd%2FP1Q%2BgsZx%2Bxh4KWrnrrFui3dN22NPrJBJtYANkZE0xD34tF2k4w8l8RF6pcuvI9FOUaEowD4i%2FzQhcvFsglOZkThvgl32yCg%2FxTl84UCYKR6wSi9JvvkVkstaC6k79D%2FnSWPFlT%2BZW5kzTmgmjmePglIwKDFrgLMSbx0Xx9hwJmu8Qu8X33JVfTjoVoQarc4L2uzNngy8vCB%2B%2B9u%2B%2FvOv2fRhsYsZpnJ1jxN%2Ba9JZvEBCFeLTzEtGgt0HuZ%2BQSNlo7Lrr5Qn1PZjMwDfjkiIf6VmsqgkglekBHXJuk0Fz2jkKB1RsRf4gHhOSLhhjZJIGUrwIpv4pgCJjfxy85DZuKhWcY7eocLHY6Kaap9Zzh6wG1Xw46JkzN2HKyRv6Ci4ehj4yb1g%2BAOBzjcagMeRJZnpC0zVyx9DEzzDE6gIVD0AjREL2i6xAvmuZwANMEJLd0M6GN7nv9MD6fsMBGNw6KEPlTS7qhbC%2F5GHk0q%2FBSHZIaneOEEg520t0OESs92bYYYLzkO%2FkWEbHiGdFYE51FCfRluvrP7lQ5Mzn9kL%2FbXXHt8tuFnBTBNLBe5rgxMYwsaUBXABHqBM0ZBz3F%2FTbdvkdyywAv2Zmjtk2y%2F6OmPpCP0eNcrdpJ0qhSizJJVAKoqOlDzAG1rKlcSosAh%2FnM%2BxcvgyNU%2FYp92I9UNNJqCOvkUZBVAHeFV6CJ%2BYzYrH9alw4Iu4oRTRPboShriySRCRIij1DonhJZ%2BeJy4AMgjagrSZcP6Dl9b2b3P3oej20tauIETRb4bC3kTLQvJLB4VuBeRaXy1VUXVswFGgW3AawcZe9ojCn3qaBTWDCJKqbYIOzi%2BlUYbs4kBYSPRRUd4RbeMjqnZ6vZTz0WHoR0ZaQf0QgsqLIxtyD8rxSBFmrPJNFuyBlH5y2mGLX2bsk4X29NeFsI77sHFE4IujrUp4flwbsJTO3waIDwACLTTujbh0UX2%2FgGFi20F9g7jX9FViYiWT5J1UyRkvzIfm9uf2inyeEpxYkKDqlCxQGgeSReMw7oaSlWGWfqost4dviWfsBpLRkCIg6G%2FWK2pKImH8%2BajaljNyOOfM%2BQpqAqFmSxPpZpz5TE4W6IyBQeNNpHrBKJnLlsq5SoltWaGmkx0%2BSjkmWMTNpih4uywz76wKo8DTee803ABBVw8hthFkThyNRyx9X3nBP50QY9d6h1GscvdVSNaoaVY%2BWil7PTarMISWYW%2Fve3xff%2BWGEXnEKXIlYu7YjBbMWr5ijEtp7xsRZnOYKhqbgpDsWxjf9FIT4pV2amTdzfNc3IFVp4IWIaSqa7ACQRoz0Ns8wJFnIyE7avLGpuEEWnOdYfPfDjqtcLxsrM3xaBzkDWRpn%2FTtdB4csGhO%2BFch4fu84TxETMYRfALK0%2BHbwH2JeKlfFHm43BwZoZRG2INzFHogp2vzyaASPE%2BDD79NRhS2eixeyf6gb4tkRm7EHJZe3ORQNGY7XxaZnT5hbnvedskKPNuPjE2FP%2FVvQdsTTELqwodifdUKHpPP5v3xMLty2jw6Y%2FvDvsOXNB39pfp8vWh%2FRNp35aPrqGOJ96Ptrhk87n70GTW05oxnpnknmQ40UTLAdlqfgOGmwyGsPvP18ln8%2Bkr%2BPn9aTRv2%2B1ay8gMazmLmk8rnFxoR1sS1aUNNHW53l1MtKTVrrp3bTl%2ByJGr1af18B45ZBUi1sV7RHFSr1M3mR5CTChBwuyutr1bKBMQK8F1%2BdhrFUAsGXg7tmLaF8Rxpw6Of9%2FtEDe1G0LK4esA7ZwbG%2FRCJj56V0NR0ZW3NEijQ5zl%2BhMd146OihN2tx1Elq0kC7Mnx5Go6xZDyS4NpdO4x1%2FoJZl1LmEdb4dfaLfHLzRxfuVsNLSPAkTQATS8dQ5q3CBGyoupceKi7gLPnYC9SJ%2F62CW5KmP8Bh1ZZE%2ByjUbS%2Fe1n86I4l9D3qbVXEQvpsiXb39dBhWLP4Ks%2FhVlWpaNf0key1aEzZePPzrSl025ud5nRPywnsxkMZ87sH3%2F%2BL%2BY0fquBpKlhBFZAN9QU86Lolk1mFBwSzZwlO3Q3gU8tFJbYL%2BOwcWzK4TgVpJXJ3ytCtSRlSwNmBXbBrJLvy5iSpF6sHZozqawCLtaisuXYbCGZbo2o%2Ft2OsvXjzoHis1Wx6quyX0qy6LoHdqJPMz6TDcSJ7NQdFXoBMsXar2odCTsFRWq1IrLu4rBe2Mxk2M3u%2FpT7SFZ%2BHovjLIoVUBHH9SZRGp7kyMN9b%2FKsuMfgD9yrwt0G%2BeeYxvnhLvmqqYQofUJPKxSRqDKzYos70V7C9ha5ENCKkATioK0pCQ4uQoUku935lz3KnJfxXN8hTmVM9FaTCQobBEV1Z1N27r86460q5kseilQv7LVgn%2BlaERwT%2FeYYGiyEs0h896W%2FGp6mp7tv%2FseZYffvE8DgPw%3D%3D%3C%2Fdiagram%3E%3C%2Fmxfile%3E÷šYØ    IDATxœìy|LWÆQ»VÕ^µ¼Öª¨­¨ª¥¯*Ş¶’X[´jMU­­(­¥ªZ-EÑRK­‘XÇ¾FBíQ[(¥Ö´	¿÷;3f&3É$™¹Ëx¾ŸÏóÉÌ{ï9“Ü™ûÍ¹çœâ½Ã757u
++›dÎè7¡á›zM2UÓúx!äqãXdÛÒÇÖ„4<Ùz8£ßéslMHÃ³¦À§µ>fñ9zL2•hšnºnÆ8	7›dŞw’‰_„x‘c‘­;ÅE„8º¦µ0†Ë²c‘Á´>†ñ	ÂÂM}(ŒÆY i}<âk‹l[úèš“ä‡É|&±’L`neÔ\zÏ¥×DSg­+B|…¸ˆjq!7t <Œ‡r€òHH7Mv%cæï—™ÇeîºÓŒóÍ²£2bÖ×9Á¨õñEˆÑ9Ù¶´+i<¹áùc÷`¹zx2£ÓÄïøH~_ûKyÔúø"ÄP„M0:¹ëNË‰„dÆ 9|>Q&.Šu&7zL2•Öú8#ÄÈ8ëÏxzs¨Ü¿¼FäV4cÜ:»À…@†LÖú#Ä0„†›ÎÚŠÆGS·ÊßÿÖ\„˜Œ%*úJ
++y7ÍÑú8#Ä¨‹éì(£Gj.ALÆòàÆv‰ßñQ
++y<Ù¶´ÖÇ!º§×DSgGÉ0Å^×\~˜ÌeîºÓ)ä‘­„dŒ£kZŸµŒøi.?LæåÑIËã­5BtOh¸i¹­\|³ì¨æÒÃx&ıC'šúj}¼b4â"Bª9¶Lıûç&ÍÅ‡É|n]àØ×ñ†ÖÇ!º'Ìaê¶6úN[CÃMËµ>Ş1G×÷ek£ïÆÉ@ŞHÔp¼œyø|¢æÂÃx&)û:nÚ¬õñFˆÑˆ‹h=ÂV,Õ\vÏåôæP‡~œœTqG­e‡ñ\¢Oßulq<«õñFˆÑpÇ«‡'k.;Œçr1z¤½8F„tÖú˜#D×P};_­7BŒÅÑ·sõğd‡KÕ­Gh}Ì¢k(¾Š#!™ƒâèÛ¡8’N(¾Š#!™ƒâèÛ¡8’N(¾Š#!™ƒâèÛ¡8’N(¾Š#!™ƒâèÛ¡8’N(¾Š#!™ƒâèÛ¡8’N(¾Š#!™ƒâèÛ¡8’N(¾Š#!™ƒâèÛ¡8’N(¾Š#!™ƒâèÛ¡8’N(¾Š#!™ƒâèÛ¡8’N(¾Š#!™ƒâ¨ïœ‰]!Á-›I£u€×R®\¹3…^ ¤zG!:„âèÛ¡8’9(úÍ™ØòZÃW%..NÔàÈ‘#âïï	”Gò8CqôíP	ÉGı&¸e3Õ¤ÑÂ¡C‡ÄÜòHÈã	ÅÑ·Cq$$sPõ›Fêª*Ê—/Vëã’Í 8úv(„dŠ£~@q„Òï‘Ç5Ä±kè )T¸¨ |Oç—ª5êX“¿@AY½ù`¦öwş¾T~±†Ô¨õŠ¿œ”¡},[·W*ùW³v„~¯G¿ëT¬TE Hö9¤Vİr"!Y^iĞXråÊ- ¤x‰R2xäD»m&}ÿ‹ü§l Y³fµ{ï%J•‘a£§P	Ñ1zÇ…³GK…r¥¬ß)5«W’¼ysK…r¥ä»Iƒ4—9-Ä±S§NR»vm©W¯T¬XQråÊ%õêÕ“zõêI±bÅääÉ“¶­…2nÜ8§BxñâEyÿı÷åÿûŸ´hÑB^yåéÚµ«ìß¿ŸâHˆµZ;uıP ÈëÍZØ-oÙ¦c¦Åqw\‚øùùI¶ìÙåĞ™[ŞÏ¦}§¬øLBwş¾õµÅkvHîÜy€”,]Ön»ç+W )¤Ñ’i³—
++ yò©|vËÇNù‘âHˆÎÑ›8Ê­hYöËåñ|yEnEËí?KÖ¬Y€,™7Nóúi!—/_‘HÅŠ­’jÇHşüù¥fÍš)¤ñêÕ«R¦L‰ˆˆ°.»wï4oŞ\ºwïNq$Ä‚Öâ8ó—ÙsôJ¦÷?ka¤Ìûmc¦ö±iß)iØ¸¹ä/PP È×3~µ¾ÖºCiÙ¦£GÅ1bË!Y±!šâHˆ1‚8Ê­h©U³² wÚüOóú©-ûöí“ÄÄD§âxàÀ¹sçˆˆ4H,X  äôéÓv2Ø«W/i×®]
++¡Œ‰‰‘şıûS	± •8½(UkÔ±¾^£Ö+ÖËÄ7—‰ßÎ“<yŸ”µ^‘	É²çèiÕ¦“Tò¯&şUkÊÿZ[…ó­ÅÏÏO È¦}§dêÌE’-{v Mßj%¯7k!9ræ”ªT—»§*¯7k!»õ Òà¿MåDB²<ó·Ô¬]O†â1q¬Y»¿ãUi¤8’yŒ"U«(]bŞ{§…|7iõû´}ëfÒ¾u3É‘#»¼ÙôUyps¯L×_ü_(+ê×ÿÊJø˜~’|cÈ­hI¾±GÆ~Ş[Ê—-)u^ò—ÿ6¬%Û½)‰î¹-¿ı<^ª½XQ¾ZS^ô//g¶ÖaÛÚ™R«fe©^µ¢4}½®¼Tã‰úmªÈ­hù~Ê`)_¶¤4¨WCÔ«!ê×”?®öˆ8Úâ(¶ˆˆHÕªUeÌ˜1v¯-ZTfÎœét;G@q$3j‹c<y¥L¹ŠR¦\E;qüıÒ¿RµF Şë%«L¤ùÛÁÖ×ü·© ù¿m”MûN™³™õuËeäMûNÉ‰„dùtØ8 EŠ—İq	2pÄx -ÛtLSWo>( ÄÏÏO¶ì?+_†ÿ CF…gZıüü¬ï=g®\GB€ÄqıŠi’%KÉ’%‹lXù­üsm—ŒÚSù‡õÉ<²|ÁDÙ5CŞjV_ÂÇô òa¶"·¢¥ïw€|5êC‘[Ñ2ndo !-_¹-ÿ\Û%åË–”˜dç†Y’%KiT¿¦È­héÔş- »7Í¹-åÊ”Ü¹sJÒ_»EnEË´‰ŸÊ¤±Éùc’%Ky£ñËÖ÷Òòu9°ıgÕÄñÀ2jÔ(;v¬Ô¨QÃúÚ;w€¬Y³†âø¸Ğ{’©ƒã	’ÉX¼-®ZO$$ËêÍ%[¶l’%Ky¾rUÙ/'’eû¡óÖÿw¾('’%{@LûN§*ÍŞ’	Ê¥l òbõÚiŠã‰„d©R­–òå:`¸Ô~¥¡ì9z…-„<†èY-ƒcJ—zVşÛ°–¬ü5ÜºÎø/ÌWNêÕ°.»zf½<_¡´ ¹?|.r+Z~ùñK ÿ)]\äV´uàÍÓ>³n·5j†üsm—t{¯• ]‚DnEË˜a@:wx[äV´,ğ´ 7›¾*³¾&WÏ¬—ûWwÈ‘=¿
++ É‘#»tíÜRVş.7Ïo¶¶rª!ƒ–S§N‰ˆH||¼dÉ’ÅúÜ•8ZÊ4nÜ˜âèk„…›¾7õĞºFD+q<~9I¬Ü’b½ ¶€¼\¯‘uÙ’ÈVq¬ğ¼¿<_¹ª.RL
++*"óÍı]‰£¥…qÎ¢µ@¯\Õ-qùÕ·@ÎÿŒµåÓ“â¸pÕVùıÒ¿GBtÅÑöRµc,âèØç1W®vƒh–/˜h•Ğ‡ï³¾¾xnÊA6Í›(]Š
++xZªV© åË–”"…È[Íê‹ÜŠ–S‡JîÜ9­ß×yóæ–È¥_‹ÜŠ–:Z»Á,ªj^ª®]»¶X“?~=z´õõ"EŠÈŒ3Rl·jÕ*)^¼8ÅÑ× 8f­Ç¬2±äDB²ì<|Qj¿ÒPò?S@ È7?.–	É²íÀ9ë—Í¶ç¬Ûn‰·|ö´8ÆœüKræÊ% dæ/éÇ˜S7dêÌE.ÅÑò~WnŠ¡8¢cŒ.Ú¿e·<­ÇŠåS¶8îß:_nß,t
++ òA§@ëkw¶KÂ©µ"·¢åè¾ÅrëâY:ÿ+y¥ò½Ø¼É+rçò69·Z.ü¾F~øzˆ¶° q#{«"±cÇÚ-;v¬T«VÍú¼gÏLq|\ 8f­Å±gßÁV1{»U;ùmí;åG …‹>+1'ÿ’	ÉR÷Õ×€Œÿæ'9‘ \¾.õŸr^Ç	J«ã½>¶¶¦G·ÆÄKÓ·Z¥*s­•naŸP	Ñ1¾&S¾úØiÇ	_ö¹-¾ì+ ¤MĞ"·¢åÖÅ-R¾lI¹sy›lš! ¤RÅÿÈ¿×•~Œ…u©ãˆÜŠ–2ÿ).İ r+Z~3Æ:XçÀöŸåµ/Éƒ›{EnEKÏ‚€üôıçªˆã Aƒ$66ÖnÙ‘#G€uª«W¯JéÒ¥å·ß~³®óàÁ1b„<÷ÜsG_ƒâ˜qÔÇÔ& /R¬¸Ìü%BªT«%¹sç‘Á#'J§®J–,Y€”.S^VnŠ‘]G.I‹ öòìs%¥şkoHã¦oË’È]r"Á~Tu%ÿjòãÂ5òìs%€ä/PP¾ûi™”­PI H®\¹åı¥¨£eğ|Oç—Vm:¥x}ø˜©ò\	å?õÔ& ·¼¯ªT—¦oµJuğ²*Q	Ñ9zGÇ	Àë¼ä/ëWL³[gıŠiR²DQëeå[_{ps¯|ıÕ »QÕ“Æ~d•ºä{dü}¤bùRòJªÒ¬É+vû_8{´T©\Nü_(+-ş×@>í×Éºm«ÿ•*•ËÉ_–2ÿ).-ß~M.ˆ’sq«¥ŞËU¥VÍÊòZƒ—¤TÉbÒ/´½Çû8®\¹RêÔ©#O>ù¤uj™3gJ‘"E¤[·nvëvëÖMüüü¤V­ZràÀQ& ïÜ¹³4mÚTZ´h!7–.]º¤¸6(Æ‡â˜qÔjqd´	Å‘Ì¡7qd\‹£Z€âh|(‡âèÛ¡8’9(ú($£P3ÅÑ·Cq$$sPõ›Fêj"åË—?«õqI2	Å1ãP};GB2ÅQ¿iİª¹9rDUi<xğ .\8Rëã’¸f¥;+Q3ÅÑ·Cq$$sPõ›sq«åµF¯Ê¡C‡T“FÿË Óú¸|\It#İÙÅ1ãP};GB2ÅQß9·ZZ·j*ÔµÎ÷ë”/_ş¬¹¥‘Ò¨!îşÁÒ„â˜q(¾Š#!™ƒâèÛ¹zx²Øş}ã"ZĞú˜#®Ù ¨9ÃPÁü¼€wLtgGÇŒCqôíP	ÉGßÅÑ¸\PÀa™€w6¦8fŠ£o‡âHHæ 8úv(Æå<€3 æ ˜
++`&€ƒ şpgcŠcÆ¡8úv(„dŠ£o‡âh\ÀyÿÆÜÙ˜â˜q(¾Š#!™ƒâèÛ¡8›7ÌeşÙÜİ)‡âèÛ¡8’9(¾Š£ñ) !€læ¸Å1ãP};GB2ÅÑ·Cq4.… ´4
++€(ó$PÃ)‡âèÛ¡8’9(¾Š£qYE\2/+`™;S3ÅÑ·Cq$$sP};Gã²@ióãƒ6Ë£ÜÙ˜â˜q(¾Š#!™ƒâèÛ¡8—ƒPú6p@q ï ˆwgcŠcÆ¡8ún¢OßµûÛ†NÜ¯õñFˆÑ 8úv.F´Çc!µ>æˆ{Ìóéxæ¹³1Å1ã8Šãáó‰šã™DE_qhqÜ´Yëã£á(	Çj.;Œçrzs¨½8F7Òú˜#îQ ÇX²@aw6¦8fœĞ‰›nÚÊ…)öºæÂÃx&s×¶oq7-×úx#Äh]Ü×V,âw|¤¹ì0‹íßV¹TRMëc¤b jC¹Tí6ÇŒnZn+ß,;ª¹ğ0É ïw9\ª6õÕúx#ÄhÄE„Ts”‹ÿÜ¤¹ğ0™ÏÍ“sÄ1ä¦ÖÇqŸœ,Û  ;S3N¯‰¦Î—«Ùêhü8¶6†…›¤Ç$Si­7BŒÈÑˆxûVÇşšK“¹<¸±]~_û®c‹ã­5â>»,ó°Ù)™#tâ¦x[ÁèÿÍ6ÙñûßšË“±¤ìÛh’ĞpÓ­3BŒÊ±ˆÎ­£Gj.?LÆ¥1~Gÿ—©E¶-­õ±FÒf»9·l[m^&ÇÌ6Áè(aá&™¿áŒæÄ¸ŸÃç%|QlJiœ¸é&[	Éq­:ŠÆéÍ¡rÿòÍEˆq?·Î.pÖÒ(G×„LÖú#îál$µm"İÙ	Å1ó„…›&;“Ç°p“Œ#3"ËügfÚ²£2bö^§»°p“„M0j}|btE¶-}tMÈÍ”ÂÑZNnì*ç÷‘?ã¾ftšøı]ck‰‹h}0í#€è…@sÛ< e^Çìîì„âèBÃMs\ÊcÈôšhê¬õqEˆ¯ ”q.Œ1ÑúàYSàÓZ[$ıTÎÌÆGÏ:ÑÔ×qŠÆx	¸)>l’©‘ÖÇ!¾†¹åq³ÖÂÃx"!“)Æe”Û66?oeÇÒîlLqô,=&™J‡†›æx[ {OØ 3»"½'lPUª¾.¿X¬¹ÜyM'šFôdâ—!!^äXDHggıı'."d9'ú6>Û”qXVÀ2w6¦8z°I¦F½&š:‡M4ğtfô¸>2¸eÒ=®÷Æşå‹AÓXÜ2ii‡NgÕ*3l¢iD¿q‘_Mé76iÒGnx¥Œ	¦À^“Lœ¸–•9Ù¶ô±ÈàFq­GøJ®i=)."ä†Öõğì{
++î{,2¸[}‡.–¯sgcŠ£1‰
++HŒ
++”¨ €DµÊŒ
++
++Ø(QÁ·Ö‡TQ«ÜµAó"ƒDÜ‰jùv€ZåBHz9ÑªÔÑˆx­ëAHjÄè¥Õ± ùg 'İÙ˜âh<¢‚>²ÇÈ €Ş.s]P‹—¢‚o›ÅQ¢‚MŞ. Lo¿]0*8à¾¥ÜÈ Àx5Ê%„Œ@q$F`&œOÇó;S‡µµÑZmZEÍVÇG­–rÙêHÑ/Gb{i\À­¾GcaÛÚpË"k½Øê¸.¨ÅK‘AJYÁ-ş
++
++x(kƒ7{«LÀ¾µÑü^ÿUŞoàYo–K!…âHŒD1 µMÏFGc˜x528à‚"o¢‚¯x³Õ1*(`wdPÀ­¨ À¤ÈVÇ£‚G$DŞõf«£¹µñ^dpà?k‚¬<ğgTPÀ]¶:BôÅ‘…—Ì†ÒÒX@”ûU§	ÅÑ8D6
++øsmp‹ ( °6¸E‡¨ €kQA¯{ºÌ­Z•Š
++
++<0Ø\‡m‘!-_
++¨phM«ã<]& ¬}ã<QAÇ£‚'î	É8/2(ğõ!U"ƒ6E,öF¹„’(Ä´Ç£KÔ	 r˜àKw6¦8‹8ª‰E-Ï··hñ¤·ÊŠ®Y3›µ\³8Z¯	Éç­r	!$£P‰8`€ NØ,_îÎÆGã¢qT­\q$„=Bq$F`³ÍcËÍÆ³AÊ4¡8Š#!„èŠ#1˜ L¿ó'€ 8äÎÆGãBq$„}Aq$F %€‡H9cw6¦8Šcªx­ï%!„¸‚âHŒB] ßX¥Å±¾»RÅ ĞÈE~T¥b„bÅ‘•vP¦åIŠ£q¡8 b,„Ò×7À" ûìQ¯v„¢@q$F`·“e]¬ugcŠ£q¡8 ˜~ì°|„wkD!)¡8=óº9Gm[òì§æq	ÅÑ¸PíøÖáùŞ¬!„8ƒâHôŒã`Çœwg'GãBq´ã;(÷lÿ@$€©ªTŒBl 8=sĞœ»68 ez–îì„âh\(vdĞÀ' ŞT§V„bÅ‘I™Ù˜âh\()ğ‡ÒUãY¸y¯vBñ$Gbòè`€§ ¼èî†GãBq´ãc(#©çh`¬*#„(ÄT‡rÇ   €]P¦äIŠ£q¡8ÚaÅæŸC¼\%BIÅ‘í Î ˆo^–À*w6¦8‹c{(ó ^5ÿlíl%‹ãæŸqãå*BH
++(ÄìÀ£ş\m–osgcŠ£qñ 8şÀ^ m¡Ü…¨ylâ¸¢Åq$”¹K·X`°*#„(Ä0Ê½©Ïè `&€ÓîlLq4.Çy r;,Ëà'Çu, ĞÀ 8^BQŠ#1Cà|ÇÏİÙ˜âh\<(_ºXâÒ¹8rT5!DS(Ä<¥_×q ÷ œğ€lîlLqÔ%Ox@¾ÔVò 8p±|¨ã‹#GUB4‡âH|Š£®xÀ÷ ’ücş9Ê`§xP“$:I’ãŠ:Gª&„hÅ‘è™ zØ¥oã „ÈîîN(ºâC ß (j~^Ê­ôz:[Ùƒâ8Š´:f ãŠ:Gª&„hÅ‘è•\ vÂõ}ª·ÈéÎ(ºb&”[çÙ’J+d
++|tÇ|Pêä„rÛÌ§ª&„Š#Ñ+# â5 ‘PF¿Î5?¾n~m˜;;¢8êŠQ.–w¶Ğƒâø±‹å}¨ ËÔ0Ê\¤?©Šãë Ê™sT5!DS(D¯ÄA9±: “J¯#îìˆâ¨+fxÙI¦;[ÙGû8~¥•u?”‘Ñƒ€TÅq”ÑÔæòbİ!$U(D¯\FÊKš¶dçq4"@¹Ôê˜sÎVöÑ>S ô‚Ò× Æ©ŠãóÏfP.Qğbİ!$U(D¯ìqcİîìˆâ¨+Ú»XŞÆÙBŠ£”»ÇÔJkEÄ±	”–×b ŞDÚ-#lO¶y\Í[$„WP‰^Ip3$»³#Š£®(èb¹ÓV4ŠãwPº6\ œÚŠ*ªÎo-×µ8Ú^Ş_ˆ4.ïBˆ7¡8½âj4µcÒ„â¨+´êã8Ëü37€oS[Qqü@}(—« L RÇt]Ş'„oBq$zå8p•ãîìˆâ¨+´êã8Âæ±ím›;®¨‚86ÿÜàIK}RÇt]Ş'„oBq$zÅ“¢['NŠ£®Ğªã(a:<^ë¸¢
++â8JÿÄ_ÍÏ‡nß«šB4…âH|Š£®p{
++àQqÜ
++åÎ+Ùì¸¢
++â8 À1 µ¡™P	!Æ€âH|Š£®p{
++àQq|ÅÅò—èø–ƒ„¢9GâóPu…ÛƒT Ÿ½å`i ‹¡Ü	©5ÌòšNqÌŸö*„ây(Ä¸uYÓG]1ÂæqªƒT ŸÇ9P.×„rOö©€[âèt46!„¨	Å‘s  õ;É¸„â¨+Ü¤ø¬80ÿ´Üµ&­	À-8M!jBq$Fàw(­3& _!wÌ 8ê
++·© ^G?(÷{vúˆJ-u¡´¾Vğ#à–8:M!jBq$F ŸÍãº –ˆ0ÀÒÚ˜â¨+Ü¤xE_p@€ >p\Aq¬`€» v ¨¸%NGcBˆšP‰h ”‘ àÑc.›—¹Š£ñ‚8~à)<ºLü…ã
++*ªÎn-—£ª	!€âHŒÀM á‘,ş`€ €2Ât·«)ÆÅâ8ĞágŠË½*ˆã ]Ì» è¸%¥ád46!„¨	Å‘‹0Ğ@a‡×ë"•ÛR‹ÄñG(ƒQæèe^I;TÇÏ§uËAsàd46!„¨	Å‘x(ıº\ñ?(÷®v
++ÅQ—¸ºõ ^Ç§ ŒÒÇñK yWPA¿tx>p»#à0›BÔ„âHŒ@)Ë»»³1ÅQ—l0Êœ„-ÈV¼ ¶ÿ€TĞÉqÄq€5 ¾†"°C ·[SŒÆ&„5¡8½2ÇüéÎ(ºäYóÏ
++ VXïl%/ˆã›ÇY Lr\A¥Á1M¡´ 6±–›¶8:M!jBq$zEÜLšPuI á Î@G§ÂäAqìeÂñ3æŸ l°ÉqE•ÄñM(—š›YËM[ÇxÑËõ"„T¡8½rÀÇiäœ;;¢8ê’Í b†yPğ‡ryØßœJ r:®¨‚8°
++Jkçj({»#Pf „Í 8½òº‡Ö¡8ê—g¡Œl ÔÙ
++>zç˜QÏİ3ö“á÷õtÅ!$-(ÄHäğœMbÜÙˆâ¨Kºø/”	¹Ï ˜ïl%½sŒã¤ãc·Äñ<€D(-íñ nx¥v„’
++Gb*C™Ã‘}}‡[Pî¹Ü
++N.[ğÑ;ÇŒ€r‰úk(w=rwTõ(¿+KÂ¼XGBq
++Å‘u š“åÎ1b~œ&G]ò–;+ùècrB“ŞQÕTğtÅ!$-(Ä„r[Á-6Ë*Ã|«¶´ 8ê’Pú5ö‡27¡Ó¹}ôÎ1WTKQnÚâ8Ğ!k½S=BqÅ‘•æŸ \Ú, &€CîlLqÔeA{Õ    IDAT%Ó|å¶yàDà Ÿ½sŒãÜ‘5 ·Äq”ËÓaP~wœ œ¢:Gbö@¹SÆ,Ø÷oLpgcŠ£.±Ü.ÏñÒ±^UmKKÇ*ˆãPäõ= ,ÜÇg³#!Du(Ä´r?êâP&n¾e$®ËûSÛBqÔ%ßAéë7@6 ß:[Éƒâí"WTACImÉVÀ-q|Õ&ÿƒ2À†BT%âXÀN(?ÓÍËf˜Ÿÿî™Ú’:eÜY‰â¨KZ¸à”œ–ñ 8~ ¨“h1ªºÃó ·Äñ(€%æÌ†"„â tÑ‰€2£ÅN(}½Ó}SL¶8Â^ŸÅ‘x‰ ^ƒ2Õ’cîlHqÔ-ùÔ2ÿtŠM ^À^(-…ER”›¶8Ú
++g¤2!„8à›ç üãîïŠ#1Ã LÅÃyOºş>6x€(£¹ÃS”›¶8~bó¸<€Ÿ=[=Bˆ’@2€“ Èj^^Ê?±¡œO™Ÿ·„ÒçC  \í˜`€5G#Z•:²*8Ê´§ é
++(w·”–Ìå AÂ®6u¡8U¸ào ±°ïŸvÇ)º"Ê†m6Øçle› üK›Ç£mçRÇ’P.KÏÂ£>õáân;„â„MxÔàrÊÍŞ4¿ö”Æ™8(’YÀæÇw |o[dsêÑˆV¥>ùàÅëæ}M0/Ïeæ xß¦ÜÅæ}—5?§8Uø:[z¹³1ÅQWtvxŞÀi(Ó+¥ÀÇ& áâñP Uql¥_£mÇ_tñB	!¾I(7Øåæ‰ld~=Êü¼)€Ï Ô1/?i^~JËbİ£­JÕ©Zøyù»6eXúK†@‘ÈÅ ›×³ôc§8UxÊÜwõ¼d“½îlLqÔ%9Ìò%ætòoÀç& O†ò…èğ8	p{T5!„d„f6sC¹Ú"xôÏsSóóõP.3[(E$w™_ÿ§ß»ş/Õ®Rø>RŠ# T„ÒÂ¸Áü|ºy=Ë,(G¢
++ı¡œhÙÇÑ7(`?”/l©­èc€…ò¹cnßrğI ¥Íé…:B|“‹°¿²ÓÊ94Àü<”« ›Íz+m¯ ­›–zíã÷­—ª-ıµ‹@iµ¬o^nˆ³G¢7¡´Ê\o“ÜÙ˜â¨+^‡òÖÍaycg+{AŸ†ÒŸ'Ÿ«T˜Çy¹i‹ãÇPæ€Œ‡ÒÚ~^zB|‚/¡ôU\
++eĞÊ> }Öée<í?Ô[ \vşÀ	 ŸÙùÊ¥ì…æ×ı¡ü3¼ÊyûK<ê[¹Àóx4ãi MğhÇ[NêCH†I€y®;9Y–Š£®H†r' o²ÛÙÊÇ' ŒI†òG2€ixÔáÛŠÅq¢ù§¥æÇ^®!äñ ”)Ê^„ò}œ*¼s1 \^¬„G—éJÃ¾	İ%G]ñ”şáleŠã‡P¾‹šŸƒÒ¿±§ãŠ:GK_$ËHp§÷÷&„tò>€Í –x.­•)Ä8ëÛÈ>ÆÄÏÅr§“q{Pg:)#”VH;t,3¡Üj0ÊÔT«T©!„Ø@q$F@ Ì%å˜îlLq4.ÇQ.–w\ cq´¥*€\Ş¬!„8ƒâHŒÀïPF“:²Ğ)ÆÅÃ-/;ÉtÇu,9 ´6öP©LcD!Ş‚âHŒDI(CıK¦g#Š£qñ 8ş`»“œs\QÇâ8ÀW ¦¨ öq$„h Å‘§¡Ì»gÛ·q%R™RÅŠ£qñ 8¶w±¼ã‹£eÇ»ßBˆjP‰øÎÆ¤9m @q42^˜Ç1Mt,ßA>ÊÄéßªR1B±âHŒ@,”ÛƒÒÊXÀÛ ¹³1ÅÑ¸Píhà2”‰ğÏàÑ½_	!D5(Äl‡ó©T¶»³1ÅÑ¸P(ó6¾a~œ@-óOBQŠ#1»Ä øÊÀ€„rÓõ4¡8Š# e@Ln “Í© jÅ!ÄŠ#1M¡Ü"Î¶c2”û§	ÅÑ¸P<º«NN(ÿ8¹šDB¼Å‘…šP¬1ÿ¬îî†GãBq`;ÆÉ6¼[#BI	Å‘™	î¬Dq4.G À(#©Bé×ky¼VÅêB Š#1eÌ°JßFKîº³1ÅÑ¸P [¡qÌfõjG!
++Gbbà|G·¤‚âh\( €W\lò²7ëc`¸	åûáİ§ü(íîØd^–Àx(S~í2ÿŒl~½€ãxÔ¯z·MNPÀ><úNŠp@€y 
++¥R×ô–à¶y™ãwÚÍë}æ¢¬ÜPº=` ”ÛXævó½Bq$†à>€ LIòºMº³1ÅÑ¸PI‰‚"@Îº³´y<ŠàYîB•ÀÏ æÛ¬hŞ×M‡ıtÆ#™zÄ±€' ¬7?ÿ-•zf¤üjx4X0Èf½Yæe¿;)''1 =m–w4/{ÉEY:ƒâHÌP‰X  “å-ÜÙ˜âh\($ƒ¸+§¡´²ÙR@_›ç®dª2‰RŠ# t5?ÿ+•zf´ü½æeóÌÏsBi­|{´0®¥r+ÒGÛ÷Js(Ä,pÀb(}-ùÓ)Æ…âH2ˆ»âxÑ¼ŞF àü²²3™ÚEÖ,8Çæç‡S©gFË?h^6Ëü<ÊU™mæå¶£ïE*m×·¥$”KÕ®Êr|¯ä1‡âHŒ€«şìãèãPIqWgÀşûä¡yÛÿØ¬c‘©PZì~p©‹c(}ãÔK¥é)ß"s¯›×{ ±yÙ Eñ¨•3@V›}Ü7/›J]Ü}¯ä1‡âHŒÀ? >v’sîlLq4.G’A"á8æ€2`äØÜ1<šh=½-G ÈÖ-(}S#=å[Çœ…ÒBù¶ùõg ,3?Î‡G’ØÔ¦Ë²1iÔ‡-$M(Ä¹Xş;SÅ‘dePhšÃòìPú:ÃÊçæmË˜—;“©W`ÇÇP<’½ŠnÖ9=åÛÒÊ@ÁÍæ\5¯?×fË¥êÓ¨ƒ;ï•<æP‰Qy);•;…âh\($ƒŒÇ£¾ƒ¶T°Àæùv ùÖ±Œ†.a~îJÜŠ xÑüØQı Ly#P.G»"3å[X‹G}åm2meù`<jÉt$@ƒ4Ê²}¯ä1‡âHŒD> ïC™ƒÍò_yšPÅ‘dêP¾# xÊ¥ÖâPîÂó?›õ@»ìæçù ôKÜo³+™zú:ÓÚü<Šx9#3å@)<ºLm!¯¹LĞÎ¼,'”>—Óñôrù;µËò€ı{%9G¢w²Cù2[ŒGıt88æ1âH2A ”‰¹ï›åO[Ş°ŠÀírÉwµö¥6)öQ(2ålğ ²@Q- NÂù ™Œ”ÿºùµg œ€2ãDw›}‚ÒÇR \ĞŞ¼<7€Ï¡x9
++eğ¹PÕ¸û^	¡8İRÀ÷Pæ@³Åû ¦h7ïÕKq4.GBÑG¢Wleñ.”»)4…2Ymº 8Š#!„èŠ#Ñ+#¡ÜU!@C›å›Ó»#Š£q¡8Bˆ¾ 8½SÊ”& Ÿ@éoc¡–;; 8Š#!„èŠ#1
++O xÊ%ë5 úAé°&GãBq$„}Aq$FäI ¡ÜV+M(Æ…âH!ú‚âHŒÌëi¯Bq42GBÑGâóPÅ‘BôÅ‘ø<GãBq$„}Aq$>ÅÑ¸P	!D_P‰ÏCq4.GBÑGâóPÅ‘BôÅ‘ø<GãBq$„}Aq$Fâ • Ü‚°5€Ş †‘Z{…ïkĞªÏê´Öcô³8ªZæìæMÎ5)]j–ÚåNz­Á¡÷ü+ÿ¦v¹Ã0éÉ‹Ÿ™´û×À›Z×ã1ÉP İx@Y yAR@€Ÿ Ä ¸@2šFÁıÄÿ•ŞÑ.fqT5Õ—Ê¨^î€Z5å¿%Khş;g†I-ÏÎ-f¿©y=óÜpÀ ã¼†ÇPZ×øüSŠ#Ã0Œ¾BqÔmşğ€¶ ‚’ÀË ¾/ş2)ÆÅ‘aF_¡8"I 6èà?ğ øøe”,YRêÔ©#Ò³gO6l˜><Õ|<ögùôËïÓ\Ñ_¢‚U/sQÇ2aÀÇª—;¯Ë{2µÏ‡ª—Ë0“Œûrìû­½æõx2dÈéÒ¥‹4oŞ\ªU«&EŠÉ¨H® PZÁó4Å 4£¦ù&Ÿ}öYéÑ£‡,[¶L>,×®]“Œ²pÃqÙvèb†·'Ú¨z™»‡’¿U½ÜCS&ÉÅ-›U/—BÒÃ¿÷®ÊÉM½´®ÆcÍÅ‹%::ZfÍš%AAAòä“Oº+#äTÕü2È >p.ŞLÖ¬Y¥~ıú2fÌ9tèGÁGãBq$„}AqÔIIIb2™äã?–^x!-y< @uLœ€‹7-[6éŞ½»\¸pÁk¿PŠ£q¡8Bˆ¾ 8êŸ}ûöÉo¼‘–@nPQ}-L±HE?øà9wîœ×GãBq$„}Aq4»ví’Æ§&‰ĞIëc6 Ká¤’O<ñ„¼÷Ş{ræÌÕ~qGãBq$„}Aq4Û¶m“W_}Õ•<> ğ¡&¶h&€m•’¬Y³JÇUFGãBq$jòúë¯KîÜ¹€”*UJ&Mš$"":u???ñ÷÷—¹sçÊÂ…¥B…
++Öï¶:uêXS¦L™:ujŠujÕª%ùóç—Ò¥KË°aÃäÁƒ""2wî\)[¶¬ wß}×®>“&M’’%KJ™2edöìÙ*·N:rûömÕ—Äw¡8“É$õë×w%ßB™*QUJ8îX™üùóË;4ûEQÅ‘¨MÕªU€UEDBCC¥W¯^òğáCë²eË–	 É—/Ÿİö³gÏ–©S§:]çÊ•+R¨P! S¦L±n3oŞ<ë÷å¬Y³ìö7~üx™={v¦Ê%Ä“PÏ¤I“ÄÏÏÏ™<.‡Š£®_ğ§c%Ê•+'gÏÕôDq4.G¢6¶âøğáCéÙ³§ôîİ;Åz®äìÈ‘#ràÀ—ë´oß^ HË–-­ËæÍ›'Ù²e ’;wn‰‹‹³¾æ®8¦U.!‚âè¬ZµÊz…Å!û <ãmi,àoÇÂ6l(ÿı·Ö¿Š£Ñƒ8ş{ç*åRõEÃÃÃ¥{÷îæt=grV¯^=¹ÿ~ªë´nİZ ØíwŞ¼yÒ¿yöÙg€T®\YîŞ½+"î‰£;å’$ÿc}Lqô:$Å‹w& äò–4æ‡2']¡:tääd­'"Bq42jˆã½«WdÓïÉ©EEä‘8^;+Ûû†Éïsçx½"G½`G‹ÄµiÓÆéz9óóó“Š+JÅŠ%W®\©
++ÜéÓ§%_¾|òê«¯ÊåË—­ëÍ›7OÆŒ#&“Ézùèı÷ß×â˜r	É,×ã×Ê‰M=åVÂ^;q¼~6B~_ßEîİ<­qIFIHHš5k:“ÇŞÇ…}õÕWZÿì 8µZw ë;´•¨à@ÙÚ]¶õ	“M]:Ëºv!rë\¼*u 8ê‹86oŞÜ*qÎ¾ÓÒÓò—5kV©R¥ŠdÍšUÊ•+'»ví²Û—EED†nı.?>[‰.Hş÷®]ÓVoè&'Maòûú÷åØÚwå÷uåÄÆîZWd’û÷ïKPP3yáiiüÙ±O?ıTë÷ŸŠ£qQKo:eÇï(?£‚eÏ°!ª”/BqÔ¶}Gm¿uëÖÙ­çLÎvìØa-í¸NRR’´mÛV HéÒ¥%))Éº­8>xğ@5j$ $oŞ¼òÁ¤)©•Kˆ§¸û­]ÓZ®i-ÇÖvR~F½#·.ïÖºjÄüûï¿R¯^=gòØÂSÒ8ÔqçMš4±u¨(ÆEÍ>»}bÆ¨à@Yß¡j­"G½à8ª:88X È3Ï<c7˜+9KHH°Ş6ÕqsçÎIöìÙ­­‰lÅQD¹­eô5 ·Ç¤V®…Õ«WËÕ«W3ú«!9ÉÿŞ•£‘í¬òxtMk9±©§ÖÕ"ä¯¿ş’%J8Šã= Õ2+AÒX©R%¹£Ò ‚ôBq4.jŠãÍS§d]‡6VqÜ;|¨je‹Põ‚£8Ş¾}[üıı€¼øâ‹ÖA+®älıúõÖ+/ÎÖéÙ³§ jÕªY—9Š£ˆÈš5k$K–,n‹cZåŠˆtéÒE>œ‘_!""r)ö»G­QØÚèƒÄÅÅIŞ¼yåñ€b•ÆB îÚî°`Á‚rşüy­ß«K(ÆEíQÕ–VGµ[E(zÀÕà§N’üùó[§ûüóÏ]NÄ]©R%ùôÓO]NÄ}şüyÉ‘#‡ 5jÈÌ™3¥lÙ²R¢D	7nœ]}>şøc;qLmğÔÊµ¤P¡BG’)l[ÙÚè»DEE9›çñ €ÇÙ¶;Ê–-›ìÛ·Oë÷˜*Gõø+îˆ\4m’S‹z$QÁÛ—;92ı[‰jİJ¶ôì¦j¹§-”ıûÊñãT)ëÊŞ=rë¬úwq"D\»vMN<)ûöí“uëÖÉÊ•+™td÷êAÑF6®œªy]Œ“É$³gÏÊÍ›7µş(¤Êøñã=2X¦šãN~şùg­ß[šP½Ë½+Wäğ7_Ë†ìú6A:¨ƒJ±r’N»™’îÜ¹#{÷î•¹sçÊ—_~)ıû÷—nİº1™LŸ°ä×oßÑ¼¾’O?ıTÆ'K–,‘¸¸8ù÷ßµşèXyçwÅñ€éÇİ¶;TræŒ@qôñ«Wù0>ÆÙÒ³›\?ÂK˜ÄØ$%%É±cÇdéÒ¥òÅ_h.“‘ôêÕKÂÃÃ%**JÎ;§é ãû÷ïKÑ¢Eåq¼»ÒØÎvC???ùı÷ß5{3éâèóµæÂÃx66mÔú°"$İ$''ËÆ¥_¿~šŸôÆÓ>|¸9rD³Ï×´iÓÅñ>€¢iIc(#j¬vìØQ³7‘^(çØ¬™.åc×GÊ‘±_Ê±ÉæÀˆa²½W7—¿+{8JÒçÎ“àà`©Zµª¼üòËR¹reiÛ¶­õşĞŸ|ò‰õ?óüùóKåÊ•%O<òòË/ËæÍöƒ6nÜ( däÈ‘.Ëúàƒ¤dÉ’R³fM©U«–´jÕJ–.]ê´,Û0|¬ÀDGGËàÁƒİ:‡……ÉÀå‹/¾I“&ÉŒ3ä—_~‘¥K—2Œ*™7oLŸ>]&L˜ Ÿş¹0Àm—.¨şKNN–2eÊ8Êã·i‰cWÛ²eË¦ëQÔP=Ë•=»
++Ç±É%1&š1HîîÜ.Ñƒ?IñwÜĞ±ƒÜ»rEëÃLwÔ¨QCš7onhûêÕ«R©R%™1c†u>}ú 	‘©S§
++ É“'ÄÇ?¥ÿŞ{ï	 ©X±bŠrNœ8!”Ü¹s[&%%I·nİ$O<.Ë²Ğ©S§ÇBÏ=+£GNõDÛ«W/™<y²lØ°Aäîİ»£Ëœ>}ZV¬X!_~ùeš9kÖ,¹qã†ªŸ·yóæ9Šc2€©‰ãVÛÂÂÂT­pf¡8z–-=í[«6th#×##4!&c¹¸ğçò;uŠÖ‡™®øã?€tíÚÕnùòåËeıúõÖç2wçÎë÷æÌ™3EDé3T¥Jë³R¼ñÆ@ºw·¿Û;w¤`Á‚.Ë²)×®]Ëü›Ö1Ë—/OU¿ÿş{Ù½{·Ü¸qCs!`˜ôæÊ•+b2™$<<ÜåqŞ»wo9xğ jŸ¹ÈóÏ?ï(?¹’ÆgmWÌ™3§\¿~]µÊzŠ£ç¸°ic
++ÉHX¾Tsùa2—c“'¦ø»²Õñ'Nœ°Î‹Ø¹sg‰ŒŒ”»wï¦XÏQænŞ¼iıîüé§ŸDDdÑ¢E2qâDyõÕW€ôéÓÇºıµk×¬BiYß–cÇ¹,+))IêÔ©ãÑ÷­7îİ»'“'Ovz"íŞ½»üøãlYd|*'NœHµe}ÅŠªY±b…³VÇ<ÎÄÑîÖ‚FêÛhâè9bÆ¶“‹#†i.=ŒgâØï1~õJ­7İœœ,+V´ûÒÌ•+—tïŞ]îŞ}$27tèPëM®˜E<((H._¾,?üğƒ "EŠHrr²ˆˆìŞ½ÛºÿÈÈÈTëd)+oŞ¼R±bE©X±¢O‹ãåË—]öeœ2eŠœ9sFó“<Ãx+ÑÑÑ2lØ0§ÇÿäÉ“åŞ½{ª|Ÿ}öYGyv&glWZ¼x±*•ó$GÏá8õ[}'­1ãFk}¸éŠ.Èûï¿/O=õ”İg·nİ¬ëXd.şüâïï/åË——   ëˆÈë×¯[§1»yó¦äÌ™S HTT”ˆØ‹£e™+§ÇC‡IXXXŠæ¨Q£äÈ‘#šŸÔFÜ¹sGL&“Ó5ƒ–Ë—/{ı³h¹eªMf;JcmÛ²fÍªšÕzŠ£çp¼œywçvÍ…‡ñLû:î6DëÃM—$%%ÉæÍ›%  @ H‰%¬¯¹êwhaúôéR©R%iØ°¡4lØP
++*$ äİwßûKÕsçÎMµe=|øP¶oßî¡w©V¬Xá´•eşüùšŸÈF‹\¿~]ÆŒã´ßcll¬W?kÖ¬qÇ«â8Õv…7ŞxÃ«òGÏá(ZËã¹Ütè¿º¥g·´ˆÇ„ë×¯Kıúõí–%''KÎœ9¥L™2Öei‰ão¼!wï>º´½dÉëåfËò&Mš éÑ£‡İ¶ñññR¬X1¹}ûvªeÅÆÆªÒò ëÖ­sÙ¯Kë“7Ãh™¿ÿşÛiß=zÈÙ³g½ö™üçŸ$wîÜòø’­8µ}ñ›o¾ñZe¼	ÅÑsP};_¢ğçŸ
++ ™5k–uÙ€ôë×Ïº,5qŒOq·­Û·oK9€üòË/"â|:şùGZ·n-}ûöM³¬!C†¤Ù?ÒÄÅÅI÷îİS€Ùºu«æ'm†ÑCnß¾-3fÌH!}ô‘W1·lÙÒQ‡Y¤ÑÀÛ/]ºäµŠxŠcúH¸~W®ÿ}ßékGßÅÑ9‰‰‰2tèP©U«–T«VMj×®-Ï?ÿ¼<XEÄù¤Ü–/ïë×¯Kùòå¥xñâ2}útë~‡*¹rå R´hQùùçŸED™ ¼K—.R¢D	©Y³¦Ô®][>ûì3IJJrY–%Å‹7¼8^ºtIz÷îâ„¸oß>ÍOÖ£·,\¸Ğéİf,ßMföìÙâ¸Ç"ş¶/T­ZÕ+PŠcúX²é¤ô™¼Yf®<’B )¾Š#Ñš;wîÈ'Ÿ|’âDÈ–F†qï¿ÿŞéhkoLÕóçŸZûb›ó@! hm+ï¿ÿ¾ÇWŠcú	7IX¸I>úz‹@R};G¢%ÉÉÉ2vìØ'Àh~bf=çÖ­[2jÔ¨Ÿ%K–xå³ZºtiÇVÇÆ ğ¹íÂ¡C‡z¥p5X¸á¸l>p^şMzf’’İK²;yğĞ­<p7İËC7“+·Ÿ–>“7§ÈíÚQ}8G¢%kÖ¬Iqâ›0a‚Ü¾}[ó3Ãè=W®\qÚZîÜ9VëÖ­ë(m`‰íÂiÓ¦y¼`µˆş=AúLŞ,}§¤>“İË‡îd’{é=Éä^ÂİK˜‡ÒêÖË>AqôáP‰VÜ¹sGBCCíNxC‡•¿şúKó2Ã%§OŸNñ9;v¬Ç?¯AAAâ–bDõ²eË<^0Ñ/+·Ÿ–¾SlZ§n‘+Ëòví)>Š#ÑŠØìúôé#/^ÔüDÌ0FË={R´:ÆÄÄxôóæ(ŸÃaìÙ³Ç£…}ã(Œ×n²ããŠ#Ñ‚k×®¥˜zgóæÍšŸ€Æ¨ùá‡ì>Oƒ’xì3;zôhGqœ–BÿøãHôÍR“2ªÚV-P};G¢Ó§O·;É8ı&¹páBŠÆL&“Ç>³N¦äYd'Y²d±ÎF|Ÿ„ëwS£Š£o‡âHÔæÜ¹s).«mß¾]ó/Ã=³gÏ¶û\õíÛ×cs;®]»ÖQ7Ù‰c¡B…<R1>GßÅ‘¨ÍÌ™3íNnC†Ñü„Ë0¾Ë—/KÏ=SüSæ	bccÅñ°8–,YÒ#ãCqôíP‰š<xğ@>üğC»Û={4?á2Œ¯dşüùvŸ/OÍï(ç(Ä)GßÅ‘¨ÉñãÇíNjıúõÓüDË0¾”Ó§OÛ}ÆBCC=ÒõâHÜ†âèÛ¡85Y´h‘İImæÌ™šŸhÆ×2`À »ÏYlll¦?»Gâ6GßÅ‘6W;M    IDAT¨É AƒìNh»víÒü$Ë0¾–Ÿ~úÉîs6şüLv)Äm¼-G–ÿ&5_xÁzìù—/'µ«øKí*şRµbEiÙø¿™.ã§Ñ_ÊSyóÈâğ‰ŞÇëÔ–Ü9s
++ )U¬˜Œïÿ‘İëóÆŒ–ò¥J	 Éš5«Ô®â/×¶o•M³fJ‰¢Eäé'Ÿ”ú5jHbL´Ô®â/Ù³e R½Òó)ÊêÙ¦µõ÷QíùŠ³øWŠ#1<—.]²;™uïŞ]nÜ¸¡ùI–a|-ûöí³û¬0 ÓŸ_Š#q5Z¶˜M<¿àgëòã«WzDCÛµ 2°Ëû™ÚÏ‹*€ÒhÉ¢‰€äË›×º,fñ¯R¹\YÙ¿h¡İºåK•’'Èšâ=ßÜµC+RÄúû8á5i¤85‰ŒŒ´;™?^ó,Ãøbşşûï£«3{ÿjŠ#q-ÅñêÖÍ²trx¦÷É´Q¦,W·nVU£](•Ë••K9İ×[ éÑºµuùì/FÉ»o¿Eq$>‡ã-V­Z¥ù	–a|5ááá–‡âHÜF+qØå}YùÍ×’-ı;u”¬Y³Z/¯Ÿùƒ/\XÊ—*%1‹•;{wËˆĞR¹\Yy¥ZU©W½šì]ø‹$ÆDËšï¦IÉ¢E€¼ûö[’-Õ+=o-ol¿¾ÖKÉC»wó˜8î[¸@*•)#—.v¹¯Åá€<ıä“rs×IŒ‰–Æ/×‘ÈéßR‰Ïáx"Û¿¿æ'W†ñÕüúë¯vŸ·ÈÈÈL}~)ÄmÔÇRÏ>+J—’Oç³ŠcbL´ôëø® ª+Ê•-›¥AÍšòç¶-’-£z+7_Ú½›Ü‹Ş+¥‹—BùóËµí[%1&ZÆôíc'‰1Ñ’'W. £z‡ÉõÛ¤hÁ’%K9¶ry¦Å1{¶lRàé|’+gÙıË|—ûº³w·-X@ Èì/FÉÑË%àµ×dÿ¢…GâsŒ5ÊîDvüøqÍO®ã«Yµj•İçmñâÅ™úüú¼8î>4Å	‘q?»‡²ş.õĞâ˜-7vn—ÿ<W\ HÙ%dÑÄ	Ö×,ƒRæ-‰1ÑÒ¤n] 3>‘¦8Z¼üâ‹@VL’iq|2O©_£†µ…ôÂÆN÷•-uì( ¤a­—dÀ{eéäpŠ#ñI>ıôS»Ù…4?¹2Œ¯Æd2Ù}ŞfÏ©Ï¯Ï‹#O€C+qŒım‰œß¸Şn½™#? òTŞ<ÖÖÆÄ˜hÉ•3‡µµòÅ
++¤T±bR¤@š¦8_½Rc¢å•jU€fTóåÍ+lXgäÒ°ÖKrgïn§âûÛ”ûÃW*SFîìİMq$>Ihh¨İ‰Œ#ªÆ{Ù»w¯İçmêÔ©™úüR‰Ûh98æşş}²æ»iÖÇMêÖ•—*W Ò«mëzeK”°^îµ,»¸iƒu0Œ7ÅñÏm[dÁøq)Ä11&ZvÌŸ+9s(RÛ»}{§â˜-u«*eÜ¹“$ÆDS‰Ï‘””dwëÙ³§æ'V†ñåÄÅÅÙ}æÆŒ“©Ï0Å‘¸–âxgïn©]Å_c¢eêàA2áãşûÛÉ‘=»øùùÉ¶¹s$1&Z†õì! ¤s`€$ÆDËİ}{¤vÙ·p×ÅñTd„uÊ gÓñÌø|„õ½Í5Ò©8FNÿVÂÚ·“ßW­ 8ŸäÆ)æ•ÓúÄÊ0¾œsçÎÙ}æ†š©Ï0Å‘¸·Å1µ	À-é,yrå’¶Í›É£>—§òæ R¤@™1b¸ÜŞ³[†të*¥‹—zÕ«I³WëY%ÍvTuÁ§Ÿ–o†’7Ş??? Më½"ß$OæQöY¾T)9´tIŠz:N n©[µç•IÊ]M -½Ú¶ ’3Gy·ÅÛR»Š¿äÎ™SjWñ—;·Û•³eÎl©R¾¼õ÷Á	À‰/píÚ5»“Ø§Ÿ~ªù‰•a|9çÏŸ·ûÌ80SŸaŠ#q5ZíBq$j@qduCqL'<zŠ£o‡âHÔ€âÈ0ê†â˜NxôGßÅ‘¨Å‘aÔÅ1ğè9(¾Š#QŠ#Ã¨Šc:á	ĞsP};G¢G†Q7ÇtÂ ç 8úv(D(£n(é„'@ÏAqôíP‰PFİPÓ	O€ƒâèÛ¡85 82Œº¡8¦ =ÅÑ·Cq$j@qduCqL'<zŠ£o‡âHÔ€âÈ0ê†â˜NxôGßÅ‘¨Å‘aÔÅ1ğè9(¾Š#QŠ#Ã¨Šc:á	ĞsP};G¢G†Q7ÇtÂ ç 8úv(D(£n(é„'@ÏAqôíP‰PFİPÓ	O€ƒâèÛ¡85 82Œº¡8¦ =ÅÑwssÓF»¿íæ]µ>ÜˆBqduCqL'GÏá(wwn×\xÏäâÂŸíş¶{†Ñúp#>
++Å‘aÔÅ1P=Ç†ííä"aùRÍ…‡ñLMh÷·7ZëÃø(G†Q7ÇtBqô1ãFÛÉÅÃ4Æ3ÙÜ¥³İß6~õJ­7â£PFİPÓ	ÅÑs\pèÇVGßˆckcTp Ü»rEëÃø(G†Q7ÇtBqô,›{tµŒÚÊõÈÍå‡ÉXû6FJìÔ)ZfÄ‡¡82Œº¡8¦Š£g¹²gw
++Ñˆ
++”ã_OÒ\‚÷swçv‰ôiŠ¿ã†íÙÚH¼
++Å‘aÔÅ1P=Ï±Y3ÊcTp ìîßGŒ-Ç¿Äè0?.ÛC»»üû]Ù³[ëÃ‹ø8G†Q7ÇtBqô±S§¸”Æ˜¹°i£Ö‡y 82Œº¡8¦Š£÷ˆ_½2Å=Œñ²¹GW¹~ä°Ö‡“jœ<yR¢¢¢ä›o¾‘~ıúI»ví¤nİºR¥J)S¦Œ.\XòäÉ#5’<yòHáÂ…¥L™2R¥J©[·®´k×Núõë'Ó¦M“¨¨(9uê”ÖoÉPPFİPÓ	ÅÑ»Ü»rEb§NñYlÿ|ES¿®æõğ–0üu$İ¹£õaä5’’’dÃ†òÙgŸIƒ¤Q£FR®\9iÚ´©„††Jxx¸DDDÈÎ;%66VNŸ>-W®\‘;æßÉ;wäÊ•+rúôi‰•;wÊêÕ«%<<\zõê%M›6•²eËJ£F¤AƒòÙgŸÉ†$))Iãw®_(£n(é„â¨×–›6ÊÉ_øD¶÷­dâ	)U´¨æuñd®ìÙ-·ÎÑúpñÉÉÉòı÷ßK§Nä‰'ÆËÈ‘#eË–-^-wË–-2räHiÜ¸±<ñÄÒ©S'ùá‡äÁƒ^-×hPFİPÓ	Å‘d”–-[
++ yê©§dıúõZW‡¤ÁÖ­[¥S§N’5kVéÖ­›ìİ»WÓúìÙ³Gºví*~~~Ò©S'Ùºu«¦õÑG†Q7ÇtBq$áäÉ“’'Oëç jÕªZW‰¸ &&Fš5k&õë×—9sæh]§Ì™3Gê×¯/Í›7—˜˜­«£)G†Q7G¹té’DGG‹ˆÈİ»weâÄ‰òõ×_KbbbŠu)$#4iÒÄîƒñôÓOËöíÛµ®±áŸş‘.]ºHõêÕ5o]t—½{÷JõêÕ¥k×®òï¿ÿj]M 82Œº¡8ŠÈÛo¿-ıû÷‘=zH…
++¤]»vÒ¹sçëRIz9xğ <ùä“@òæÍkı,Ô«WOëª3›6m’§zJfÎœ©uU2Ä?ü ùòåóz¿K=BqduCq‘öíÛ‹ˆÈíÛ·%O<rø°2•HHHHŠu)$½¼üòË’;wnÉ–-›”/_^*Uª$ùòå“¼yó>ö—õÀÒ¥Kåµ×^Óº¡AƒòÛo¿i]U¡82Œº¡8ŠHÛ¶mEDdæÌ™R·n]ëòvíÚ¥X—âHÒC||¼”/_^Æ/""õë×—­[·ŠÉd’Ò¥KKß¾}5®áãÍ¼yó¤U«VZWÃ£´lÙRæÍ›§u5TƒâÈ0ê†â("W_}UòæÍ++V¬û÷ïËW_}%M›6M±.Å‘d†ºuëÊÎ;­Ï¯_¿®amoöîİ+¾ùy”={öh]U 82Œº¡8šÙµk—ÄÆÆŠˆÈ½{÷dñâÅrôèÑëQIf¨U«–a^ø2<???­«áU h]U 82Œº¡8:aÿşıV‰t„âH2CõêÕ=Ú¯qÛ¶mÒ Añóó“€€ yûí·¥jÕªòÎ;ïÈíÛ·=V¯Ñ½{w™>}ºÖÕğ*Ó¦M“^½zi]¯CqduCqå$bé?iÒ$É‘#‡<÷Üs2aÂ„ëRIfğ÷÷·¾ò»ví’9rXŸß»wOÊ”)#Ÿ}ö™GËñ$o¾ù¦Ì=[“²÷ïßïsı]Ñ¢E9tèÖÕğ*G†Q7G	‡Jrr²+VLV­Z%ÉÉÉòæ›o¦X—âH2ÃóÏ?/Çóè>ÅQD¤sçÎNûèê-ÅqÜ¸qòÉ'ŸhR¶Úôïßßé?À¾Å‘aÔÅQD:uê$""QQQR¦Lyøğ¡ˆˆtèĞ!ÅºG’Ê•+''Oôè>‰c‡ä½÷Ş³>ÿûï¿¥cÇÒ¾}{yë­·dÆŒÖ×._¾,Mš4‘ºuëJ«V­¤C‡R®\9ùá‡dÜ¸qR¤H«ä2$Å-W­Z%Íš5“wß}WZµj%—/_‘›7oJHHˆtìØQ¤{÷î""2aÂ)R¤ˆT¯^]$**ÊåºŞ C‡2ş|¯í_OÌ;WŞ}÷]­«áU(ÿoïìãj¼ÿ?ş‘)7‰lCft3Úá¬IEIJE*BjˆÑ&"#Êıİ[Œ±¹+…’Ìmn—ÜÅÈ]%£u^¿?Î·ë×¹)§Óé\:½ŸÇó±uÎuÎù\su=]çº!IõJáÀÃÃ!!!055Edd$D".^¼(÷ÜnDupttÄıû÷UúœÒá˜““deeq·y{{ã»ï¾ ş*»]»v8ş< ñ	ğËNTXXˆ¶mÛr'Ä/sù­ƒfff\8fdd@OO‹ÅuëÖÁÁÁ 9sæ  D"‘Äò$ıœ•M«jºtéRá>ÌšÆÕ«WÑµkW¾‡Q£P8’¤z¥pPPP€ğğp¬Y³%%%(((ÀäÉ“-3-…#QjjÇ²ƒc,,, §§‡Ÿş™»ÿõë×¨_¿>Š àçç‡)S¦ ¸¸õêÕÃ¥K—¸û&L˜ p8†„„`àÀÜ}999`ŒáéÓ§X³fLMM‘€’’‰1K?geÓªCCÃ}ş÷MŸ_
++G’T¯åxúô)nÜ¸ÒÒR¼}ûVî4Du>|¸ÊÏ¯W~‹£H$Âœ9sĞ¨Q#üûï¿ ş¡<x0<==áéé	kkk ++Œ1Ü½{—{¾Ù³g+>>>022â×ÃÃ;wÆ7PRR‚ÈÈHÃÀÀ «W¯®ğ9+›VÕ0ÆpêÔ©{ş÷‰“'Ojüiy(IR½R8ÈÎÎÆÀÁCçÎQTT333¤¤¤ÈLKáHT‡ï¾û+V¬PésJU]\\ŒÖ­[cñâÅ ş‹cù¯gß¾}‹/^p[ËŸ[Rz‹ã!C°iÓ&îg###.çÎ+s„rQQJKKQPP ‘H‘H„¸¸8èèèp§"’ÇÊ¦U5Œ1,Z´¨Fû}#,,ŒÂ‘$I•JáñŠqÃ†ÈÉÉ‡‡ ñ#y§ì p$ªC||<¦L™¢Òç”wpLDDÚµkÇ}í;jÔ(ÌŸ?Ÿ»şüùøé§Ÿ ˆ¯22uêT â}%ÂqÆŒÜş‘7oŞDƒ¸pÌÌÌD«V­¸+à<}úfffxûö-&OÌ}^ZZŠ¶mÛr§†>|86lØ€GaÎœ9•N«jcğôô¬‘ç~ß6l…#I’*•Â8ê°ü
++…ª&j‚®]»ª,ŠÎœ9hiiÁÍÍwîÜ ¼xñ-Z´€­­-Î;‡¢¢"øøøÀİİ
++
++Bii) àñãÇ0` zõê…#FÀÏÏO"³²²`nnWWWüøã033ƒ¥¥%RSS Ä€0räH¸¸¸p~ıúÁÛÛX²d	÷œñññèÖ­˜˜Xé´U%11±ÒûcØ´iüüü”~Ú€¯¯/6oŞLáH’¤J¥p`oo¼¼< ÿÏ=£kU5BFFÌÌÌøF…HïãXÛĞÓÓCÃ†)÷ş²Zºt)&O¬Î¡©I“&!""€æ_zÂ‘$Õ+…#€˜˜èééaàÀ022ÂĞ¡CÑªU+ÄÇÇËLKáH¨‚§OŸ¢mÛ¶r÷£å›ÚQQQĞÕÕEãÆÑ¨Q#™€,R¡¡¡èÛ·/ŠŠŠÔ=Ì!??}úôAhh(w…#I’ª”ÂñÜ¼y!!!ğññÁÜ¹sqëÖ-¹ÓQ8ª";;ŞŞŞ033Cdd$9‚G¡°°·1EEE¡C‡Ü	Àk+}ô÷7§|@¾yóF&¤N<	===„‡‡C(ò4âêñâÅ,^¼úúú8}ú´Ä}$IªR
++G9¼~ıºÂsÉQ8ªæÊ•+X¸p!€o¾ùÍš5ƒµµµô‚DVQ---‰Ÿuttàëë[aHÍ;7Æ„	‘‘¡æOrdddÀ××ººº[ËCáH’¤*¥p0eÊ˜˜˜p_şóÏ?èÖ­Î;'3-…#Q)((€‹‹´´´Ğ·o_¸¸¸p¶mÛ–;çcu™1côõõ§’çSé-6DDD^¿~ıÎúùçŸaii‰®]»"88ø½;çãÉ“'Œ®]»¢oß¾—”…#I’ª”Â@¿~ığêÕ+‰ÛŠŠŠàìì,3-…#Q›ÑÑÑ‘ùÑÈ‘#U Ğ³gO^Ã±ü>eÁXECêêÕ«‡¥¥%tuuñİwßaáÂ…ˆÅƒjbè2Ü¿±±±X¸p!¦M›†&Mš oß¾WøÈ|
++G’$U)…#$OÇS///™Û(‰ÚŒ¼pLKKÃ›7oTö|‡c³fÍ ££#Œe(R/^¼@ll,BBB0xğ`|úé§Ğ××‡¯¯/F‰   ¬Zµ
++»wïÆùóç‘;wî ''ùùù(.. >9{~~>rrrpçÎ¤§§ãüùóØ½{7V­Z…   Œ1¾¾¾Ğ××G»ví0xğ`„„„ ../_¾¬òØ)I’T¥ œ‘ ‘H@|Ù¶Ã‡ÓGBãÇò§œŠ‹‹ÃÀ1jÔ(:¹¹¹Ü}prrÂ¨Q£0pà@‰ë^Ÿ={=zô€µµ5fÍš%………pwwÇèÑ£áââÿŸÇ#GTz¿ªB*??§OŸÆ;ÀÀ@¸»»ÃÁÁ:uâ.Ÿ¨¯¯†ÂÚÚ6„¾¾>`llŒN:ÁŞŞîîîDDD~ÿıwœ>}ùùù*'…#I’ª”Ââ•¢‰‰	š6mŠvíÚAWW:tÀíÛ·e¦¥p$j3:::èŞ½;¬¬¬`eeCCC âe@OO‹ÅuëÖÁÁÁ€ø`18p  pıúu|üñÇxùò%^½z…V­Z!&& péÒ%hkksá9sæ ÿƒÌÆÆF­ó+M)i4}~)IR½R8ş×¯_#))	[·nÅ±cÇ*üêÂ‘¨ÍT´Å1$$änÏÉÉcOŸ>ERR7nÌm‘€;bß¾}HHH€®®®Ä}:tàÂqÍš5055EBBB…g*P7šRÒhúüR8’¤z¥pü%%%HNNÆŸş‰ääd:¡‘H‡ã½{÷  >>>022‚§§'<==áááÎ;ãÆØºu+š4iÂİçéé	ssslÛ¶QQQ2Ëtù¯ªKJJÉ}m»zõjõÍlT%¤¤F?{ö, àÄ‰°°°À| nFeHHH€@ {¥*U@áH’¤*¥p„øô;_|ñ´µµÑ²eK4hĞ ;wÆİ»we¦¥p$j3òÄç0:t¨ÄmEEE(--Å±cÇĞ¢E‰û^½z…ÿşûG©t‹cAAD"D"âââ ££ƒË—/×Àœ)2!%ï÷vüøq4kÖL%cÚ¾};…£’P8’¤z¥pàââ‚˜˜”––o%Ù»w/\]e#‘Â‘¨ÍT™™™hÕª={@¼2633ÃÛ·oñæÍ˜˜˜àøñã Äû*ÚÚÚ"==ÅÅÅ000Àşıûˆ÷q¬W¯“'OÆ¥K—  ¥¥¥hÛ¶­Â§‘©)(5
++G’T¯ ÓñšOAAÜÜÜ ¥¥üôÓO2Ó<xÀÈ‘#áââÂ K'''xyyÁÕÕ¿ıöwßùóçÑ£GØÛÛcâÄ‰°°°À¹sç~ıúÁÛÛX²d‰Zæ·2j2<x{{ÃÕÕÿüów_ff&œ1jÔ(888 11‘»¯|8nÙ²úúúpttÄÕ«W‘šš
++'''øøøÀŞŞ^î{W$IªR
++G 2'@~üø±Ü- Q»Q6Ënee333‰pÌÈÈ€¾¾><y Ø¿?:uê„’’îÈôøøx âƒš5k†¬¬, ’á¸jÕ*¬_¿{^{{{=z ğï¿ÿÂÍÍ­Æç·6AáH’ê•Ââ­-Z´€““FAƒA__Ÿû#_
++G‚¨İÔÔÇ8::r?—””@[[ÉÉÉHJJBÓ¦M%öíß¿?-ZàÿÃqÓ¦M˜:uªÄë:¸råJ•ÇP8’$©Z)ÿGFFBBBàããƒ¹sçâÖ­[r§£p$ˆÚMM…£F-1MË–-ñçŸbëÖ­2û<<<0qâD âpüğÃagg‰K >}úĞ××G×®]‘””T¥±S8’$©J)!ş—¿¯¯¯BÓR8Dí¦¦ÂqîÜ¹2[4h€ääd;vLæèó~ıúIlq´°°àN’>kÖ,nº²+È#,,Í›7çäS
++G’$U)…# }}}¼xñB¡i)	¢vSSá˜™™Yá>eG¦>| ]á>·oßFÓ¦M‘šš
++ °¶¶æ¶@Şºu-Z´Ğš˜ßÚ…#IªW
++G nnnÈÎÎ–¹½ü¿úË p$ˆÚMUO ^şhô²x<uêúöí‹ÀÍÍ;øÁƒaoo///8;;KU‘‘ÁƒÃËËöööÜ5µÏœ9sss´jÕ
++K—.Ett4Ú´i###üôÓOÃ€àíí{{{.>kb~k#$©^)Lœ8†††3ffÌ˜ÁÙ±cG™i)	¢v£é!%¦Ï/…#IªW
++G Í›7ÇìÙ³e455•™–Â‘ j7šRÒhúüR8’¤z¥pğã?Ê½ıÏ?ÿ”¹Â‘ j7šRÒhúüR8’¤z­Óá‡)S¦`æÌ™¸pá‚B¡p$ˆÚ¦‡”4š>¿$©^ël8FFF¢qãÆèÛ·/zõêmmm$$$¼óqQ»©nHÀÅÅZZZèÛ·/œaii	???<zôHE£T$IªÒ:İºuÃÃ‡¹ŸSRRàììüÎÇQ8ïâæÍ›°²²ÂŒ3`kk‹nİºaÆŒpssÃ={TòÙÙÙ5jLLL¸ç¼pá¬¬¬`cc£ğôòìÜ¹}ôQ¥§¦’~İò?Ï›7ßÿ=ÆŒƒŒŒŒ
++ŸãÔ©SğööÆœ9sĞ·o_<ş¼Êc­ª
++©ò§è‰DX³fZ·n{÷î)ôxGGGDEE©d,•AáH’¤*­³áXşD½eH_öâÅ‹2ÓP8ï"77—;ÕÊO?ı„É“' ÒÒÒğ÷ß«ìu=*s=õĞĞP,\¸Péç455}ç9M¥_Wúç[·nÁÀÀ ·oß–ûøAƒáôéÓ €àåË—JWj"Ë0` †¢Ğã)U…#Iª×:...2·yzzJü,’ …#Q5Ê‡# ¬]»X°`Æ‡·oßÿ#ÅÉÉ	óçÏÇÌ™3Ñ¾}{8p ÒçV$ÃÂÂ‚¹sçbŞ¼yï¼½,8€nİºaíÚµï|]yãğ÷÷ÇŒ3äû‡~€ƒƒŞ¼ySéüÕ5;vì@ƒğêÕ+äååÁÅÅ>>>ğööÆŒ3¸+¾,[¶­ZµB÷îİáââ‚„„„J§¯$IªÒ:ZZZĞÑÑ‘Pú6---™ÇQ8UA::ÄıÿÄ‰qğàA @=¸-Üqqq°²²zçs=zíÛ·G`` gÏ=¹pLHHØ²îää„C‡Ux; Ç;wî`Ê”)Ü¥îä½î»ÂqñâÅpww—y<¶EE    IDATlZZàææ†¡C‡âíÛ·ˆÇÈ‘#Õ²õ¨Ùp<sæcÈÌÌDnn.âãã¹û¦L™‚;vp?Koq|×ôÊBáH’¤*­³áØ·o_œ;w®RmlldGáHTépLJJBPPÂÃÃaccÃ…C£FğìÙ3 @zzºÂáXÙÇˆˆL™2…»oÚ´iX¼xq…·âp3fºuë¡P¨ĞëÊ‡ŸŸŸÜ-ÎÎÎˆEII	ÆŒ777¼|ùÓ¦M{çüªŠšÇÓ§Osá(‰¸¸¸ S§N˜:u*7­t8¾kze¡p¬{ÆÆÆÂÕÕ æææ5jşı÷_‰inÜ¸[[[,[¶Œ·q.[¶vvv°¶¶Æ÷ß¡PˆmÛ¶ÁÊÊ
++ƒÂ’%Kxß‰'0hĞ Ì™3‡÷÷õ}±Î†cÙ>V•qæÌ™Û(‰ª Í›7ç1((ˆ@€óçÏ¨ÚÇÊÂñÈ‘#8p wŸ££#>\áí€8Ÿ?ÈÈHŒ7N¡×•şùöíÛîãèííÍ›7‡Ò¤I“ğé§ŸâÆïœ_UQ“á¸}ûvhkkãÕ«WØ¼y3ÌÌÌ Š<<<ãÇç¦•ÇwM¯,uÓ„„XYYÉ½?>> >>>¼3<< Üm111;v,òòòxÿ=nÙ²…ÂQÊ:ÊBáH(Jzz:œÑ³gOœ8q Œ!C†`éÒ¥èÛ·/†Š'OàâÅ‹ppp@hh(ÂÂÂ`mmÍ=O—.]dÔÍÉÉ:tè€ıû÷ .]ºØÚÚâÒ¥K €`Ö¬Y–Ø—QŞíû÷ïÇG}„•+WâüùóhŞ¼9&OŒÂÂÂ
++_·üÏeûMúøøT‚999ğôôDhh(Ö¯_ùóçcÂ„	4h¶lÙ¢‚ß:˜˜Xéı5}pŒ««øoÄ¸qã$şÑVi8¾kze¡p¬›¾+Ÿ?}ûö!##ƒ×qJ‡ctt4Æ‹'Oğş;
++)åIáXE(‰šàòåË(.. ŞRXçÎƒ——ŸC«uèéé¡aÃ†ˆŒŒ”{M…ãO?ı„–-[âîİ» ÄûyöêÕ¥¥¥‰Dè×¯ŸD>6lÀ£G0gÎœwN¯,uÓÊÂ1''îîî4h„BqÀ™››C `Ù²e>|8,,,0mÚ4äççC(bôèÑÜ×ßB¡«W¯FÏ=!påÊÄÆÆÂÚÚšûêùøñãğòò‚öíÛ'wœåÃqß¾}Fãµk×àïïQ£FÁİİ«V­ÂóçÏ!
++akk@ @€?ÿü“ûz9((èó$Š·¾zzzbüøñpwwGll,w…£¬U„Â‘¨	~ûí7Œ?;v,<x  xğàJJJx]í"**
++ºººhÜ¸15j$ª8¸››´´´`ccƒ¡C‡ÂÚÚ¾¾¾Üû ÏŸ?ç¶8>044ä¶2ÆÇÇ£[·nppp@bbâ;§W
++Çºé»¶8¦¤¤H„£P(D@@ PTT„©S§B `ïŞ½
++…ÈÎÎ–G¡ğÿ£íÊ•+
++…HJJ‚@ @Ÿ>}ğÏ?ÿ 88—/_®pœeáhkk‹¯¾ú
++®®®2_QçååÁÖÖxöìöîİ@€Í›7s÷[XX@ `Ú´i¸sç¦NŠ”””wÎÓ… àëë¡Pˆ9sæ@ àÒ¥K
++)åIáXE(	âıç£>âşæ”È7oŞh|HI£éóKá(ßê„ãöíÛ!
++±bÅ
++nkP¨X8
++…BÌš5 ÎÎÎï<¸¥,GÉ=W@@ ^¾|ÉM@€¡C‡B(ââÅ‹pttä¦)ÇÓ§OC(Çdaaá;çişüùƒP(ÄÏ?ÿ,Š²R8B|N5iF%K–ÈÜNáHT‡ÇcÅŠpvv†……ôõõamm-½Ğ*PKKKâgøúúj|HI£éóKá(ßê„cÙÖ¸U«VA  <<B¡âáxçÎî«ãäääJÇYş«êääd|ıõ×X³f7ÍæÍ›!Ğ«W/xxx`Ø°a°µµÅ€PPP ¡ğÿÃñÖ­[Ïÿ®yš4iú÷ï¸¸¸ÀÖÖ
++)åIáù' ÷„„²Ìœ9­ZµÂüùóqàÀÜ¿¿Âs%ÕCz‹cÃ†×¯_k|HI£éóKá(ßŠÂ1))	=R*Ÿ<yÂaÙAKKK™p\±b&L˜ @€áÃ‡sû"ÊSúà˜ß~û{„„…âfÊ¶`–=îåË—øçŸ¸ŸËÂ±ümŠÌShh(BCC¹Ç<{ö<€PHá(Ï:cÆŒÁ˜1cğé§Ÿrÿ_¦‡‡ºwï.ó
++GBŒ±oß>¾‡Q'(¿cY0–GÓCJMŸ_
++GùVóæÍÃµk×”
++G¡Pˆ@ àşıû¸víyeáxíÚ5Ì˜1Ü¹$ùå—
++Ç)ït<eûZZZ"==¹¹¹èß¿?ÌÍÍ¹0LLLÄôéÓ¹Ç(gÏå¾/**‚P(DDD~ûí7…ò¬Óá‰ÈÈHtîÜ™ûÿ27nÜ(±£{DU122’{NP¢fhÖ¬tttd‚±Œª†ÔäÉ“Ñ²eKtêÔ	...°¶¶FçÎ¹«ş(BQQ¹#YïŞ½www6=zôÀµk×ª4¦ª@áX÷”wğ2û÷ï³gÏrŸÅ={bşüùØ¼y3¬¬¬ 0xğ`9rööö°³³CLL„BñÈ€——Ö®]‹şıûC ÀÃÃÛ·oç®×~ñâE8 ½{÷ÆâÅ‹eÆYÑ	Àóóó1räHî ™mÛ¶!55¾¾¾<x0¦NŠàà`dggC("((_}õ<==‘šš
++¡P¨ğ<ÅÆÆÂÃÃîîî˜:u*–/_/^Hœ ¼ÿşØ¹s'ïïíû`Ç2Ÿ–Â‘¨?üğvíÚ¥Ôcÿıw|úé§?~<BCC
++www=z´ÊÏUÑ©i4‘#GTz¿2!eooğğpîç•+WBOO»Öø»X·nF@ü÷fıúõ0`  ñ…şùçŸ*IQ(I’T¥Ÿ”øï¿ÿ …B,_¾kÖ¬Áÿı'3-…#¡(/^¼€®®nµÃÂÂBâ\×¯_—{E–wÑªU«jC“PE8:u
++Œ1äää(ôøàà`‰K0®Zµ
++#G¬ò8”Â‘$IUJá`ğàÁÜõo¿ı;v„——|||d¦¥p$åçŸÆÌ™3«õåÃ1>>ÑÑÑ €¹sçâ‡~À÷ßÏmM,,,„³³3–.]Š1cÆp[&·oß&Mš 44şù'¶mÛ†¦M› ’““ñÅ_àÜ¹sÜ¹Òììì0{öltîÜñññØ¿?üıı±xñb|ûí·øï¿ÿPRR‚I“&aéÒ¥˜>}:6lØP­ùT'ªÇÙ³gã‹/¾@ii):„Î;cÌ˜1 €]»vÁØØsæÌ ş˜˜˜ÀØØpttD§NğÉ'ŸÀÑÑIII‰DX´h\]]áááÀÀ@¼yó€øï“–/_>}ú@[[›»¬dMÍom‚Â‘$Õ+…#€#F o!jÒ¤	®_¿ pww—™–Â‘P”Q£Fá·ß~«ÖsXXXÀÓÓpuuEtt4`ggÇMóõ×_ãúõëxşü9N: ÈËËÃW_}ÅM#½Å±üÏnnnqÚ³gO @vv6nŞ¼‰Ö­[ãÕ«W Ä××^·n>|ˆN:!// ¸×­(]»v…§§'¾ùæ˜˜˜ %%…»?22’G äÂ‡fù-+W®”Øâ¸eË˜››s'{wwwÇÒ¥K¹û{öì‰Aƒá¿ÿşÃ™3g°víZ…ÇNáH’¤*¥p„øÒ_€øw¯^½¸Ûå]êÂ‘P{{{\¹r¥ZÏQ~‹ãÓ§OñäÉDDDÀÂÂáááÇÈ‘#qôèQ¼|ù!!!X¸p!-Z„öíÛsÏS•p,Û .^¼îµ¸óîÚµvvv°¶¶Æ_ıU­ùT'å¯®(Ò[Oœ8æÍ›#33@õÃ±OŸ>çİ¹s'ºtéÂıÜ³gO¥¯ £ÌüÖ&(IR½R8B¼¥OŸ>ĞÕÕÅP\\ŒˆˆØÛÛËLKáH(Š‰‰IµzŞÇü1dÈîçÄÄDdggcÕªU˜2e
++ ñ¾ºåÃÑÀÀ €øšØ `hh¡P 077—Çò”ŸŸ###î ÌÌLœ={¹¹¹Ü·óçÏ£k×®ÕšOuÒµkW\½zµJ‘Ç²ç™;w.€ê‡£¡¡!zöì	OOOxzzÂÑÑ‘ÛòˆÃ1..®Jc€+W®ÀÌÌ¬Ê«MP8’¤z¥püçÎãN‰ñêÕ+ìÙ³7nÜ™Â‘P”AƒáßÿUúñüñÚµk¤¦¦JÜ†àà`„„„`öìÙ(--ÅÍ›7aee…   üøãhŞ¼9öîİ 7nfÌ˜ÁÅËòåË1fÌüôÓO°°°€¿¿?={†Ñ£G£{÷îØ¿?÷Z111˜8q"æÏŸäååáÁƒğôôÄ’%KPíë)«ooolß¾½J‘İ»wÇ÷ß X½zµÄ7cÇ­R8ZZZbÍš5Ï_şäğÊ†ã¶mÛ$¶ k"$©^)+¡l¥P
++GBQZ¶lÉíH¼?DDD ((¨J‘ÇÛ·oC[[›; )..»`@qq1>ûì³*…ã/¿ü‚~ıú¡´´€ø«pOOOî~eÃqúôéX¾|y•W› p$IõJáñ×òüğÃe¦¥p$¥uëÖÈÍÍå{„W®\‘{9ÑŠ˜:u*Zµj…/¿ünnn2d¾ùælÜ¸‘›æíÛ·2dúõë‡É“'cÌ˜1øüóÏ±cÇDEEÁÔÔ;vÄØ±c333´k×nnn(--…H$Bxx8áíí///nkõ¼yóĞ¢EXXX`Û¶mUšWGGGî`?M…Â‘$Õ+…#ÄG¥FGGsnÛ¶ŞŞŞ˜?¾Ì´„¢´iÓÙÙÙ|ƒÃ¤I“°~ız¾‡Q£¬]»|£Æ¡p$IõJáTø/ò±cÇÊÜFáH(JÛ¶mñğáC¾‡AT€&Ÿ¦F$¡^½z|C-P8’¤z¥p¬€§OŸB ÈÜNáH(JûöíqïŞ=¾‡AT@JJJ•¾²®M8;;KœgR“¡p$IõJáñ
++¾¼hØ°!~üñG™i)	E122Âİ»wùQ	»víÒ¸x<x°Ò×G¯P8’¤z¥p`ee…K—.q^½zr§¥p$Eçq$jÀÒÒ’ïa¨„Ş½{#66–ïa¨
++G’T¯ fÌ˜¡ğ%¼(	EéĞ¡nİºÅ÷08uê5j$q¤tmbÃ†ĞÕÕErr2ßCQ;$©^)hkkãÌ™3
++MKáH(ÊçŸ›7oò=BAJKKáïï.]ºÈ\­ç}åÜ¹sèÒ¥&Nœ‘HÄ÷pxÂ‘$Õ+…#Äçq|ıúµÌíòÎ™FáH(J§NÎ÷0ˆ*ríÚ5899¡W¯^Ø²eßÃ‘A$aË–-èÕ«œœœ¸+^ÕU(IR½R8X¶lœœœ…¸¸8N™i)	EùòË/5şäËšÌÙ³g1~üx0Æ0nÜ8Ş·B&''cìØ±¨W¯Æ³gÏò:÷
++G’T¯ tttĞ³gO[´h!3-…#¡(]»vÅÕ«Wù¡~ùåøøø€1+++Ì›7Çã.¨jJKKqìØ1Ì›7VVV`ŒaìØ±øõ×_käõj3$©^)!>}…<æÍ›'s…#¡(İ»wÇåË—ù¡bNœ8 _¿~°±±¡¡!ú÷ïDDD 66§NÂåË—‘™™‰ììl¢¤¤………ÈÎÎFff&._¾ŒS§N!&&ğóóCÿşıÑ¾}{ØØØ _¿~X°`Nœ8Á÷,¿×P8’¤z¥pğèÑ#™ÛöíÛ'÷rq„¢üı÷ß|ƒ¨a²²²””„7"((£F‚¥¥%ºwï;¢M›6hÖ¬úõë‡fÍš¡M›6èØ±#ºwïKKKx{{#((›6mBRR4¾ŠP8’¤z¥pàââ"sÛ0pà@™Û)	E177ÇÅ‹ùAh4$©^ët8fee!++vvvÜÿ—yãÆ:8†¨={öÄùóçùAh4$©^ët86iÒMš4Aıúõ¹ÿ/³uëÖX°`Ìc(	EéÕ«ùJ5…#Iª×:eøøø(<-…#¡(}úôÁéÓ§ùAh4$©^)å’’RáIu)	EéÛ·/N<É÷0B£¡p$IõJáÀßß666 €•+WBGGmÛ¶Å²eËd¦¥p$ÅÚÚÇç{¡ÑP8’¤z¥p„ø¨j‘H„’’ ..%%%ptt”™–Â‘P”~ıúáØ±c|ƒ 4
++G’T¯ ÆŒ HHH€±±1D" `äÈ‘2ÓR8Šbgg‡ÄÄD¾‡A…#IªW
++G 		©©)"##!‰pñâEîëëòP8Šboo„„¾‡A…#IªW
++G Çš5kPRR‚‚‚L<ÑÑÑ2ÓR8Šâàà€Ã‡ó=‚Ğh(IR½R8V‚¼«~P8Šâèèˆƒò=‚Ğh(IR½ÖÙp¼{÷.^¿~ ˆ‹‹“+]9†¨ÎÎÎ8pà ßÃ †Â‘$ÕkGcccìŞ½  ¯¯={ÊØ¢E™ÇQ8Šâêê*ww‚ T…#Iª×:oß¾åşÚ´ir§™9s¦Ìm„¢:ûöíã{¡ÑP8’¤z­³áXW¯^!33·nİBqqq¥ÓR8Š2lØ0ìÙ³‡ïa„FCáH’êµN‡ãİ»wáêêŠpãÓÖÖÆ!CpïŞ=¹¡p$ÅÓÓüñßÃ †Â‘$ÕkÇ eË–°··Ç;pæÌœ>}Û·o‡­­-Z·nGÉ<Â‘P///ìÜ¹“ïa„FCáH’êµÎ†£¯¯/Ö¯__áık×®…ŸŸŸÌí5Ã½§™¸òğ,NfÆiŒvƒ­9ƒ÷q¨ÒŒÜTä=àûãB$©^ël8ZZZ¾sºrLÍRğê)¤Fai| Ââü4N3›ú5ïã¨	W'}“™q(~#äûcDÔq(IR½ÖÙptvv~ç4C‡•¹ÂQ5œ¿›¤±ÁX¦×œ˜´Æ÷qÔt@Ş{šÁ÷Ç‰¨ÃP8’¤z­³áØ·o_œ;w®Ri‹cÍp 5Š÷à!Uë•É|¬ˆ:
++…#Iª×:ZZZĞÑÑ©T---™ÇQ8V„´?*ŒÇçã÷‹ë±'eùºõìJ¬>öC…ï_Fn*ß/¢BáH’êµÎ†£‹‹Ë;§qss“¹ÂQy2rSåÇ”-HœFÖ¯d§`óép™÷qi| 
++^=åûcFÔ1(IR½ÖÙp,((Pj
++GåYô½Dh,>€ä¬ã¼‡©œG3beâ1&5ŠïQÇ p$IõZgÃQY(•ãÊƒd™È8y;÷ø!«ç”-2ï+mu$Ô	…#IªW
++Ç*Bá¨\\/[Ï®ä=zHÕ(½ßãù»I|Üˆ:…#IªW
++Ç*Bá¨Ò§Ş¡­š£ôVÇ?.V|b}‚P5$©^)«…£rÈœ¾%;…÷à!U£ô¾Û’#ùş¸u
++G’T¯U„ÂQ9¤Ã‘ïØ!UçÅç$ŞÛÕIßóıq#ê$©^)«…£rP8j¶Òï/A¨
++G’T¯U„ÂQ9(5[
++G‚/(IR½R8V
++Gå pÔlÇÌÌL5~êŞo<y‚^½z1ŞÆáëëÆLMMyCu p$IõJáXE(•ƒÂQ³}W8fffbáÂ…˜4i222xø¨_¿>c4hrssqæÌ|òÉ'X½zµÚÇ]i8.X° ­[·cæææHJJBtt4ºtéÆÚ·o•+WVk$I*,…c¡pT
++GÍ¶¢p,ÆÀÀ@øùù!,,ŒÇO!Ğ¤I0ÆğğáC @DD&OŒ·oßò2w…# 8::‚1†íÛ·s·EFF‚1†1cÆT{$IVE
++Ç*Bá¨š­ôû+Œ~~~˜:u*o[Ë(Ç¬¬,øûûËl­+--Ehh(z÷î777ôîİ—.] |öÙg\`M<zzzpvv†¡¡!cptt„··7ôõõáää„7oŞ ‡··7ìííÑ¿6yyy T‡‚@ Àˆ#ğÕW_!$$„ÃÍ›7áàà GGGX[[cÄˆÈÍÍ ¿şú+Z´hOOO¼|ùß}÷ºté‚ñãÇcĞ A˜;wn5ßÕBáH’ê•Â±ŠP8*…£f+ışNš4Iâ‹ŸŸŸDDòå| Æ>úè#4lØÃ‡—¸¿wïŞ`ŒÁÒÒ~~~hØ°!š4i___Œ3Œ1Ô«W1bÌÌÌ0`À 0ÆğñÇcÂ„	Ü×È€ŸŸŒŒŒÀƒ§§'ÜİİÁƒ±±1üüü¸Ç~ñÅ¹]»v`Œ¡yóæ000€š6m
++Æ:vì???6ZZZøä“OàççKKK0Æ 0nÜ84mÚ|ğ|}}áéé	ÆÚ´i???n¾š5k†qãÆ¡C‡:t(üüüàêê
++ÆºtéÂÅ¿™™ïïcy'L˜@áH’j”Â±ŠP8*…£f+ışfdd ,,L"ß›-£FcFFFÈÉÉáî8p ·?¡‹‹ºví
++SSSÜºu‹Û2g`` ñœe[Ç cë×¯‡H$BãÆÁƒƒƒœœœ`jjŠo¾ùFâ±Õİâ¸téR0Æ0aÂ @RRcèŞ½;.\¸ Æ:tè  ())áşqóÕ®];X[[£K—.(.. deeq±mdd„)S¦àÁƒÕ|Tmq$IõJáXE(•ƒÂQ³­hGé€\¸p!ŸBÉ}Ë&îÜ¹3={ ÜÀ­[·ryøğ!JKK+ÜP:şÊÂqíÚµ(--EÃ†ÁÃ½{÷  "‘ˆ‹/U…ã’%Kä†c=pşüy…Â±yóæ˜7oc˜8q"÷Z—/_F`` LLLÀÃ—_~©Ôï¾¦ p$IõJáXE(•ƒÂQ³}×QÕeÉçQÕ€d8–””`È!`Œáë¯¿Æ‹/°lÙ20Æ @¼ÿ_÷îİ!‰”
++G prrc{÷î üõ×_7nœÜÇÊC‘p¼~ı:4h [[[ ÀÏ?ÿÆÂÂÂP\\###4nÜ¯_¿Æ­[·ÀC¿~ı¸y,?_Ã‡çÆ{áÂ.öKJJĞ¬Y3´nİZù7  p$IõJáXE(•ƒÂQ³Uô<|F£¼Óñü÷ß°±±áöã;|ø0‚‚‚Ğ®];xzzbäÈ‘HIIğÿç;lÚ´)·E®ü¹‹/¿üŒ1tëÖiiiÈÉÉÁ°aÃ`bb‚±cÇbìØ±xöì™ÌceÆ\•Óñ<x èÑ£æÌ™#qpÌÀaooKKKxyyqÇ”Ÿ¯¨¨(Ìš5‹ÛçqÑ¢EèÑ£<==1xğ`tîÜ111êx»†Â‘$Õ+…c¡pT
++GÍ–®Cğ…#IªW
++Ç*Bá¨š-…#Á$©^)«…£rP8j¶_P8’¤z¥p¬"ÊAá¨ÙR8|AáH’ê•Â±ŠP8*‡:ÂqÙ¦Hšˆ¯âQ¿~}tíÑ•óÓöm1gñÕ~¯±^ø¸ÕÇ8z)QéçèÕ·5j$>	ó§m0;l¶Ì4IÅ€Á`ÚÙf3|fú¹:`_Ò^¤?NC×]Ñ@»cèÔµ“ÌãGŒÁ-s_tùNÆP8	…#IªW
++Ç*Bá¨êÚâ¸&jµøQ½¦·/Zı£JÂÑ´SG0Æ°e÷æê=OgS0ÆäFcúã4têÚ	–ı-q=çÒ§átÚ)w4Æ‚å¸iM¹“3—eúã4\¾—‚ÖmZsËÜ±ËI5ŸP8’¤z¥p¬"ÊÁw88#WÊ{ò –®_‚´Üë5I)GÁÃ0ïa·¯İºF"XM;›ÂÆ^|*¯±^ÜíK×/‹§…#Q›Oüë  [IDAT' p$IõJáXE(•ƒÏpìşuw\¾—‚ôÇi?yw.¿6Ÿ¶Á¶è­heĞ
++†&†8p2W]ÁÔà©èğytÿº;zôì}Çö!ıq¦Ï½fz`ŒaÑêq*í$6jÈ=×„©ĞT¯)Z´Â†ë•ÇÃgq_·»zºbÓÎøûî%¹Ï±vë0Æ ×L›ÇŞV½ğË-D€Â‘$Õ+…c¡pTu‡£––Œ>3‚ÑgFhØ¨!UéÓ0v’cøüËÏqşÖ9˜÷6ÇÅ. ıq¾›3Œ1L9	×s®¡m»¶hña\ºséÓ`eÛ—ÇôÇiø3á0ÆP¯^=ìˆÛ=‰»¹T6¯e_…ÑgFRÃFá1ÚC" M;›âê£+ø¨åG`Œaéú%ˆ?ÛAıs"šÂ‘¨P8’¤z¥p¬"Êñ¾lqLœ†”¬¿ñiû¶âÏ£Q;¬‰ZÍİWvpÍ²M‘Hœ‹ÿ…â¢JÃQÿC}¤?NÃ•©Üg=%ëo¥Â1ıqşJ=†¡^C ÛTWbrå.ñéÓ0nÒX0ÆğµÅ×ğâ‹u¿­£p$ê$©^)«…£rğ;â¶s™”¹xÍb0Æ ÛT—ÛÚ˜ş8ûêù“O?igS´ù´>üøCLû!°Òp,ÛÂxõÑî³~.ó¬ÒáXæÕGW°uúìÆZÒZ&‰ã¶zšt4ÁÕGW(‰:…#IªW
++Ç*Bá¨|sòú	ìÿK¼¯bZîuXØXàËnâk
++?’›®Q;îkß²Û’oœÁ…Ûçk</şs+·¬ÄÙ›É|#˜şZöUè4ÔÁ§íÛÊ„cúã4t7ïÆÆŒGúã4
++G¢Î@áH’ê•Â±ŠP8*ßá¸e÷f.ªæ-‹à…Á8x&Ú:ÚĞÒÒÂñ»ş8³ÀƒÛˆ¡\°uíÑ•‹ÎšÇc—“`çd‡3é§ÁÃ«r÷íKÚÆFû–¿ìÙ‚Q¼qäb…#Q§ p$IõJáXE(•ƒï€w4Æø€ñîã‰FÁq¨#Â×.æö!üğã±hõ¸ò0gLDÛvmÑ£gôíßKÖ…#ı±äQÕŸ¶o‹-»· ÃçÀCí˜€aŞÃ¸ÏºôVÃ2¥O ^6Æ/º|;';¤Ş¿Œo¿óÇ—İ¾Äç_~.İ»À¸ƒü' õşe¤?Ÿ ¼Q£FèÚ£«Ì¾”;ıÎo’1:8¡ÙP8’¤z¥p¬"ÊA—Ôl)	¾ p$IõJáXE(•ƒÂQ³¥p$ø‚Â‘$Õ+…c¡pT
++GÍ–Â‘à‹¢¢"‰•ØÌ™3y_±’¤&{ÿş}‰e.$$¤ZË0…#!
++GÍ–Â‘à‘H$±óóóÃË—/y_¹’¤¦zıúu‰å-""¢ZË0…#!
++GÍ–Â‘à“éÓ§K¬È?~ÌûÊ•$5Õääd‰åmãÆÕZ~)	¹P8j¶Ÿ,X°@bEvûömŞW®$©©&$$H,o;wî¬ÖòKáXÇxóü9®­_ƒüé•NGá¨ÙÖåp<zô(ôôô°{÷n €¯¯/c055 ¬[·Íš5c¹¹¹|µÖsîŸ£ø'ïºÌí+V¬X‘¥¦¦ò¾r%IMu÷îİËÛ¡C‡ªµ\S8ÖANàè(/œª0 )5[MÇ½{÷¢K—.`ŒÁĞĞ«W¯ øøø qãÆpssCnn.öîŸœ}Ó¦M €‚‚‰p 33³
++ÃQúuú÷ïæÍ›ÃÉÉ	YYY¸yó&úõ_r²I“&ğóÿ~=<<P¿~}0Æ0hĞ ôéÓ;vDPP?®†ßúILßƒE‡&aİ±‰€Ü²e‹ÄŠìÔ©S¼¯\IRSıå—_$–·Ó§OWk¹¦p¬ƒäß¼£ŞÃ‘0ÌÇÆ’š­&†# DFFŠ/å8~<  ++vvv¸té’Ät………ÜÿW5å½Nhh(cèÓ§ àÒ¥K`ŒÁÄÄDâqMš4c> DEE1†¯¾ú
++oß¾­æÜ¿Ÿ”}ÆÂ`İ_â€Ü³gÄŠl×®]¼¯\IRS“XŞ®]»V­eºN„cŞÅ¤”''ù#a˜+gY@Ü¾€ÂQÓ•~óŠ½—>.zX%ç-c#FÇác±°éo…Ë7.r÷§İIEÏ^æâËA‰ÇEyÿ:cø¬ƒ	=Àã¢èÜ¥c¸vëoî¶òÎ[8Gü:£†#·ğ¶íúŒ1è6ÕEná$?(Ş"iÔ¹…87iÆRÒ/ ·ğr
++î£µA+ñĞ¨õÈ-¼¯2sTmÁ=¥Œ»òš$ËÏD@ğnEÊûÊ•$5Ñ¼¼<™³¼xñ¢Z]¥ñáx7z./]LJyjÊD‰pLæŠ#Ã‡áNô> šnÙûºàÿıéÄü÷Ò'TI·‰ÀCëö£ö°õè%5M¾ıÑŒ1X:…'Â°âà÷`Œ¡U»°ñD6CÛÏZƒ1†¥ûƒ¸ÛÊë6ÑŒ1X8öÀ¦“a°pìÆº÷í„M'Ãğı&0Æğñ'-°éd§N#m0Æ°dÏî6“.íÀƒ½Wl:¹Peş¬jOı¨”NÌÇ’ø)OšŒß'H¬Ìòòòx_É’¤¦yâÄ	‰å,,,¬Ú]¥ñáHÈò¶¸G<İ¸`LáËáxõä	7…£fûÿïí„ÅMàñÓ¨ZÊ¾Bîß¿?ÀCxx¸Ä4ÑÑÑ`ŒÁßß@õ¾ª666ÆÀÑ»wo£¨¨€â_U@ïŞ½ÁÃìÙ³Uò;xßØšÉ}Ş–ÆbÙ‘é¸ò ááá+´cÇñ¾’%IMsÓ¦MËYtttµ—i
++Ç:È-?#Ác¨Ü`,ƒÂQ³Õôp?~<®]»†æÍ›ƒ1&qŞ2U†cÙ>Ò(¥¥¥\à–å­IäŞÇ’ÃS$‚±ŒƒJ¬ĞÖ­[ÇûJ–$5É—/_bêÔ©2§¾ª.uŒÒ7opÜ<R–.–ŒeP8j¶u!àÌ™3hÔ¨´´´°k×. ïW8nÙ²Œ1˜››käÁ1»/mÀ’ø@‰`,Cú2hxñâï+[’ÔoÜ¸!±ŒM:"‘¨ÚË5…cäµ§ş pÔl51+:Ï¡C‡ğÁ AƒğòòB¯^½¸¯™¹ó86mÚ+W®”8£··÷;_Ç××Wâ~EOÇcaa:`Ö¬YÕŞYı}%_øo¥÷K_AæäÉ“¼¯lIRS”>íÕæÍ›U²\¿3?üğC•¼Q» pÔl51‰ÚÇÖ­[%Vleç´ä{…K’µİ¬¬,øûûK,_çÏŸWÉr›.éLê•lÚ$jšëÅç$Âqyâ¾?nDEúëj???$$$ğ¾Ò%ÉÚîÚµk%–«éÓ§ãÍ›7*Yn;&ÇdÂñÑ£G*y1¢ö W²SxR5Íˆ•ÇM'ğıq#ê0Ò_§M›6ùùù¼¯xI²¶š™™)ó²3gÎ¨l™ıı÷ß¥Ãñw™pLIIQÙµƒ¥ñáxòvïÁCªÆ=)[$Âñ×3Køş¸u˜üü|Lš4Iæ”!|¯|I²¶ºxñb‰å)44T¥ß/_¾\:W0ÆØÍò7V÷‚ØDíã‹ë%ÂqëÙ•¼©—™)‡®ÿÎ÷Ç¨ãìİ»WbE7qâDdffò¾&ÉÚæ‘#Gd¶6¦¥¥©ty
++
++’ÇYŒ1]şÆ_~ùE¥/J¼ÿ\y,óu5mu¬ıJnm‡ãµGªÙaš ”åÕ«W˜6mšÄÊnæÌ™xòä	ï+b’¬-^¿~]æ€˜ÈÈH•/¯£F’Ç1Œ1^şÆÅ‹«ü…‰÷ŸÕIÁ’—	;€ä¬ã¼Ç©œ’û6–]j0¹…÷ùş¨;&³¥dÉ’%tnG’TÀGÉüãËÏÏÙÙÙ*_Víìì¤ÃÑ1ÆF—¿100På/L¼ÿdä¦Ê„FXœö^ş•÷"÷Jv
++¶œY"ó>.DÁ«§|Ì€ø*:+V¬YñmÛ¶÷•2I¾ÏaŞ¼y2ËNMífXvÛrš1ÆØ×åo´°°¨‘'ŞÒşaq~Øpbv^Ü€½—%ßC·]‰ÕÇ~¨ğıËÈMåûãE¼zõ
++?üğƒÌ
++ğ¯¿şâ}åL’ï«6lYfÖ­[WcË¨¶¶vùh|ÍÓfŒ1İòáX¯^=üûoåW  4—˜Ô¨
++ãƒ¬Ê»A¼äååÉ\_·ìt"|¯ Iò}sûöí2ËÊÂ…ñúõëY>÷ìÙ#½µñ+Gvù;ıõ×Q;87Iæ=dísuR0î=ÍàûãD•rãÆ™üıüü°wï^ŞWÔ$ù>˜ŸŸ•+WÊ,#Ó§OGaaa-›ŞŞŞÒá8¹|8î(§««k„¨¼zŠ˜Ô(
++ÈZèê¤`œÈŒEñ!ß#‚Pˆ£GÊ¬ıüü°fÍğ¾â&I¾|øğ!BBBd–o¿ıYYY5¶L–””@OOO:Û”G‡òw6nÜ¸Æ6}µ{O3påA2NdÆ’ï±¹©È-zÀ÷Ç… ”âÀrãqşüùÈÉÉá}N’êöÚµk”Y&&OŒ«W¯ÖèòxüøqéhÌ`RÔgŒå—Ÿ(66¶FEAåùûï¿e®,ãçç‡©S§âĞ¡C(**â}eN’5m^^¢¢¢äîÂ¤–KCO›6Mîc¤Y[~"__ßAA”çşıû˜1c†Ü­ÁÁÁ8{ö,ï+v’¬	ƒ€€ ¹ŸÿE‹¡¨¨H-Ë¡¡¡¡t8ÚÊÇoÊOÔ¤I<{öL-$‚ ˆ2
++
++
++0ş|¹+Ï²#IoŞ¼ÉûŠ$UáË—/qâÄ	Uø™ß¸q#Ş¾}«–åïàÁƒÒÑ(üß7Ór¹]~â‰'ªeAQ×¯_cıúõ®HıüüŠ?ÿüéééxùò%ï@’ŠZPP€.à×_ÅÌ™3+üŒûûûãğáÃj[îD">ûì3ép\SQ42ÆXXù‰ë×¯ÌÌLµ˜ ‚ Êsùòe¹WÊ6007nÄÙ³gqçÎ:›|¯|òä	222˜˜(÷ªIò\½z5<Pï?ÿü³t4¾dŒµ¨,?fŒ=/ÿ :5AÁ7§OŸÆìÙ³Zá–É`Íš5Ø¾};öíÛG’j1**
++Ë—/GHHH…û,Vdxx8nİº¥öeL(âã?–Ç°Ê¢±ŒRBr2]y‚ ‚à—’’?~¼Ò¯öH²¶†k×®ñ¶|-X°@:Ÿ1Æš(õ™Ô¾=zôàmF‚ ¢<%%%HKKÃ;*= €$ßwCCC]£'óV„'O qãÆÒá8C‘h,ÃNz«ã’%Kx)‚ ‚F$áîİ»Ø¿¿BûB’$Ÿúûû#""‰‰‰xúô)ß‹  ´´666ÒÑø1Ö *áÈc1åŸ¤^½zj=²‡ ‚ ”!??>DFF._¾ŒS§N!>>±±±$©‘œœŒ+W®àöíÛÈÉÉQÛ9«JPPt4‚16¾ªÑÈcícÿ•"]]]dddğ=AAD5Ù½{·¼hL`ŒÕS&cl„ô£°°ïy%‚ ‚ ”$55:::ÒÑ˜ÉÓU6ËX,ıû÷Gii)ßóLAAT‘'OÀÀÀ@:‹cFÕFÆÄ›+÷JÇcPPßóMAAT7oŞÀÜÜ\:Kc6ªˆÆ22Æ.JÇcxx8ßóOAA(@qq1†"o¿Æ*zGQ>bâÃ³%^läÈ‘xıú5ß¿‚ ‚ ¢²³³Ñ½{wyÑ¸»&¢±Œ/˜ø;p‰577G^^ß¿‚ ‚ BŠ‹/¢eË–ò¢1•1¦S“áÈc]c¥_¼M›6¸~ı:ß¿‚ ‚ âìŞ½ÚÚÚò¢ñ<cL¿¦£±ŒOcéÒƒhÜ¸1bbbøşAAÔiD"‚ƒƒå#cûcÚêŠÆ2tcI¦^½z>|8ï×]$‚ ‚¨‹œ9sİºu«(«;ËSŸ1¶MÎ  ­­éÓ§#??ŸïßAA„Æ“™™‰ÁƒWŒ%Œ±Ñ¼Ô¢†3Æ09Õ××Ç²eËèÈk‚ ‚ ˆàÉ“'ğ÷÷Gıúõ+ŠÆkŒ±n¼b%è3Æ~còCCCìÜ¹"‘ˆïß/AAD­çÕ«WX°`tuu+
++ÆbÆX0CüŞbÃäœï±Ì6mÚ`ìØ±Øµk={Æ÷ïœ ‚ ¢Öpûöm¬_¿ÎÎÎhÚ´iEÁÆØ)Æ˜1¨Mc«˜ø6Î”––¾úê+Ì™3§NBII	ßïAAÄ{Ã‹/‰'ÂØØ¸²P,³1æ¯æîSÆŒ±HÆX>{÷Œ‚1†?ü:tÀ7ß|ƒAƒÁÛÛ%I’$I’Ô8CBB0iÒ$>vvv022‚Bíô?o3Æ¦3Æš«­òj&>’çSü@’$I’$IVl	cl?cÌ–i0íc¾Œ±?cÿ2şé$I’$I’µÅccÃ˜†l]¬
++õcİcAŒ±#Œ±WŒÿ7„$I’$Iò}ñ	cì&ŞèÖñÌÿî6×‚:.FO    IEND®B`‚
+\ No newline at end of file
+--- a/docs/GeneralDiagram.xml
++++ b/docs/GeneralDiagram.xml
+@@ -0,0 +1,2 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<mxfile host="app.diagrams.net" modified="2020-05-19T10:34:09.352Z" agent="5.0 (X11)" etag="Iwx7x3ZgGJV1WBx6e0Da" version="13.1.1" type="device"><diagram id="2CBHIzs9DMrx8Qk8myeK" name="Page-1">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</diagram></mxfile>
+\ No newline at end of file

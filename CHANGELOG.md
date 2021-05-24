@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 <hr>
 
+## [0.3.0] - 2021-05-24
+
+* CHANGED
+    * Updated kernel patches
+
 ## [0.2.0] - 2021-04-01
 
 * ADDED
